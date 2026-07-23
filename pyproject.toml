@@ -1,0 +1,137 @@
+[project]
+name = "community-backend"
+version = "0.1.0"
+description = "FastAPI 엔터프라이즈 백엔드 보일러플레이트 (MySQL + Redis)"
+requires-python = ">=3.13,<3.14"
+dynamic = ["dependencies"]
+
+[tool.poetry]
+# 애플리케이션이지 배포용 라이브러리가 아니므로 패키지 빌드를 하지 않는다.
+# 이 설정이 없으면 `poetry install` 이 프로젝트 자신을 빌드하려다 실패한다.
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.13,<3.14"
+
+# --- 웹 프레임워크 ---
+fastapi = "^0.118.0"
+uvicorn = { extras = ["standard"], version = "^0.37.0" }
+
+# --- 설정/검증 ---
+# email extra 는 EmailStr 검증에 쓰이는 email-validator 를 포함한다.
+pydantic = { extras = ["email"], version = "^2.11.0" }
+pydantic-settings = "^2.10.0"
+
+# --- DB ---
+# SQLAlchemy 2.0 Sync + PyMySQL 드라이버.
+# cryptography 는 MySQL 8 기본 인증(caching_sha2_password)에 PyMySQL 이 요구한다.
+sqlalchemy = "^2.0.43"
+pymysql = "^1.1.2"
+cryptography = "^46.0.0"
+alembic = "^1.16.0"
+
+# --- 캐시 ---
+redis = "^6.4.0"
+
+# --- 보안 ---
+# PLAN.md 2-1: python-jose(미패치 CVE)/passlib(유지보수 중단) 대신 아래를 사용한다.
+pyjwt = "^2.10.0"
+bcrypt = "^5.0.0"
+
+# --- 로깅 ---
+structlog = "^25.4.0"
+
+# --- 스토리지 ---
+boto3 = "^1.40.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.0"
+pytest-mock = "^3.15.0"
+httpx = "^0.28.0"                       # fastapi.testclient 가 요구
+testcontainers = { extras = ["mysql", "redis"], version = "^4.13.0" }
+ruff = "^0.14.0"
+mypy = "^1.18.0"
+# s3 extra 를 지정해야 서비스별 스텁(types_boto3_s3)이 함께 설치된다.
+types-boto3 = { extras = ["s3"], version = "^1.40.0" }
+pre-commit = "^4.3.0"
+
+[build-system]
+requires = ["poetry-core>=2.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+
+# ==============================================================================
+# Ruff — lint + format (PLAN.md 2장: black 미사용, ruff format 으로 통일)
+# ==============================================================================
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = ["app", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle error
+    "W",      # pycodestyle warning
+    "F",      # pyflakes
+    "I",      # isort (import 정렬)
+    "N",      # pep8-naming
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "SIM",    # flake8-simplify
+    "TID",    # flake8-tidy-imports
+    "RUF",    # ruff 고유 규칙
+]
+ignore = [
+    "B008",   # FastAPI 는 기본 인자에서 Depends()/Query() 를 호출하는 것이 정상 패턴이다.
+    "SIM300", # 변수 간 비교를 Yoda 조건으로 오탐한다. 뒤집으면 오히려 가독성이 나빠진다.
+    "RUF001", # 한글 주석의 전각 문자를 모호한 유니코드로 오탐한다.
+    "RUF002",
+    "RUF003",
+]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+# PLAN.md 3-1: 설정값은 반드시 core.config.Settings 를 통해서만 접근한다.
+"os.environ".msg = "환경 변수는 app.core.config.settings 를 통해 접근하세요."
+"os.getenv".msg = "환경 변수는 app.core.config.settings 를 통해 접근하세요."
+
+[tool.ruff.lint.per-file-ignores]
+# 설정 모듈 자신과 alembic 환경 스크립트는 환경 변수 직접 접근이 불가피하다.
+"app/core/config.py" = ["TID251"]
+"alembic/env.py" = ["TID251"]
+# 테스트에서는 assert 및 픽스처 재정의가 정상이다.
+"tests/**" = ["S101"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "tests"]
+
+
+# ==============================================================================
+# mypy
+# ==============================================================================
+[tool.mypy]
+python_version = "3.13"
+files = ["app"]
+plugins = ["pydantic.mypy"]
+
+# 점진적 도입이 아니라 처음부터 엄격하게 간다 (보일러플레이트이므로 부채가 쌓이기 전에 고정).
+strict = true
+warn_unreachable = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+# 타입 스텁을 제공하지 않는 서드파티.
+module = ["testcontainers.*"]
+ignore_missing_imports = true
+
+
+# ==============================================================================
+# pytest
+# ==============================================================================
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q --strict-markers"
+markers = [
+    "integration: 실제 MySQL/Redis 컨테이너를 사용하는 통합 테스트",
+]

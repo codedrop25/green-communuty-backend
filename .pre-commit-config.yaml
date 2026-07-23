@@ -1,0 +1,40 @@
+# 커밋 전 자동 검사.
+#   설치:  poetry run pre-commit install
+#   전체:  poetry run pre-commit run --all-files
+#
+# CI 에서 떨어지기 전에 로컬에서 잡는 것이 목적이므로, 느린 검사(pytest)는 넣지 않는다.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: detect-private-key
+      # .env 가 실수로 커밋되는 것을 막는다 (.gitignore 를 우회한 add -f 대비).
+      - id: forbid-submodules
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.14
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.20.2
+    hooks:
+      - id: mypy
+        files: ^app/
+        # mypy 는 프로젝트 의존성을 알아야 정확히 검사한다.
+        # pre-commit 의 격리 환경에는 없으므로 필요한 스텁을 명시한다.
+        additional_dependencies:
+          - pydantic>=2.11
+          - pydantic-settings>=2.10
+          - sqlalchemy>=2.0
+          - fastapi>=0.118
+          - structlog>=25.4
+          - types-boto3[s3]

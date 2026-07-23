@@ -1,0 +1,25 @@
+# PLAN.md 8-4: 빌드 컨텍스트 최소화 + 비밀값 유입 차단
+.git/
+.gitignore
+.idea/
+.vscode/
+
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+tests/
+docs/
+*.md
+
+# 실제 환경 변수 파일이 이미지에 들어가지 않도록 한다.
+.env
+.env.*
+!.env.example

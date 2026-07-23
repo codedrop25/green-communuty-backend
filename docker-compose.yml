@@ -1,0 +1,89 @@
+# =============================================================================
+# 로컬 개발용 구성.
+#
+# [보안] 모든 포트는 반드시 `127.0.0.1:` 을 붙여 바인딩한다.
+#   `- "3306:3306"` 처럼 쓰면 Docker 가 0.0.0.0 에 바인딩해 DB/Redis 가
+#   호스트의 모든 네트워크 인터페이스로 노출된다. 공용 Wi-Fi 나 방화벽이 열린
+#   환경에서는 인터넷에서 접근 가능해지며, 자동화 봇이 약한 자격증명으로 접속해
+#   데이터베이스를 드롭하고 몸값을 요구하는 사고가 실제로 발생한다.
+#
+#   Windows Docker Desktop 은 방화벽 예외를 자동으로 등록하므로 특히 위험하다.
+# =============================================================================
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: community-mysql
+    restart: unless-stopped
+    environment:
+      # `:?` 는 값이 비어 있으면 기동을 중단시킨다.
+      # `root`/`app` 같은 기본값을 두면 그대로 쓰이다가 사고로 이어진다.
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD 를 .env 에 설정하세요}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD 를 .env 에 설정하세요}
+      MYSQL_DATABASE: ${MYSQL_DB:-community}
+      MYSQL_USER: ${MYSQL_USER:-app}
+      TZ: UTC
+    command:
+      # 이모지 저장을 위해 utf8mb4 를 서버 기본값으로 강제한다.
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      # 컨테이너 재시작과 무관하게 시각 기준을 UTC 로 고정한다 (mixins.py 주석 참고).
+      - --default-time-zone=+00:00
+    ports:
+      # 호스트 루프백에만 바인딩한다 (파일 상단 보안 주석 참고).
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      # 앱이 "아직 초기화 중인 MySQL" 에 붙어 죽는 것을 막는다.
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: community-redis
+    restart: unless-stopped
+    command:
+      # Redis 는 기본적으로 인증이 없다. 노출되면 즉시 장악되므로 비밀번호를 강제한다.
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD 를 .env 에 설정하세요}
+    ports:
+      # 호스트 루프백에만 바인딩한다 (파일 상단 보안 주석 참고).
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: community-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # 컨테이너 안에서는 localhost 가 아니라 서비스명으로 접속한다.
+      # .env 의 값을 덮어써서 "로컬 실행과 컨테이너 실행이 같은 .env 를 공유"할 수 있게 한다.
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  mysql-data:
+  redis-data:
