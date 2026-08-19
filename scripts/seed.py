@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.logging_config import configure_logging, get_logger
 from app.core.security import hash_password
 from app.infrastructure.database.session import SessionLocal
-from app.modules.comments.model import Comment
+from app.modules.comments.comment_model import Comment
 from app.modules.posts.model import Post
 from app.modules.users.model import User, UserRole
 from app.modules.users.repository import UserRepository
