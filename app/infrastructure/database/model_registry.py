@@ -16,7 +16,8 @@ Alembic 은 `Base.metadata` 와 실제 DB 스키마를 비교해 마이그레이
 
 from app.infrastructure.database.base import Base
 from app.modules.comments.model import Comment
+from app.modules.menus.menu_model import Menu
 from app.modules.posts.model import Post
 from app.modules.users.model import User
 
-__all__ = ["Base", "Comment", "Post", "User"]
+__all__ = ["Base", "Comment", "Menu", "Post", "User"]
