@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.logging_config import configure_logging, get_logger
 from app.core.security import hash_password
 from app.infrastructure.database.session import SessionLocal
-from app.modules.comments.model import Comment
+from app.modules.comments.comment_model import Comment
 from app.modules.posts.posts_model import Post
 from app.modules.users.model import User, UserRole
 from app.modules.users.repository import UserRepository
@@ -29,14 +29,14 @@ def _get_or_create_user(db: Session, email: str, nickname: str, role: UserRole) 
         return existing
 
     user = User(
-        user_email=email,
-        user_password_hash=hash_password(DEFAULT_PASSWORD),
-        user_nickname=nickname,
-        user_role=role,
+        email=email,
+        password_hash=hash_password(DEFAULT_PASSWORD),
+        nickname=nickname,
+        role=role,
     )
     db.add(user)
     db.flush()
-    logger.info("seed_user_created", user_email=email, user_role=role.value)
+    logger.info("seed_user_created", email=email, role=role.value)
     return user
 
 
@@ -50,21 +50,21 @@ def seed() -> None:
         # 게시글이 하나도 없을 때만 예시 데이터를 넣는다.
         if db.query(Post).count() == 0:
             post = Post(
-                post_title="환영합니다 🎉",
-                post_content="이 게시글은 시드 스크립트가 생성했습니다.",
-                author_id=admin.user_id,
+                title="환영합니다 🎉",
+                content="이 게시글은 시드 스크립트가 생성했습니다.",
+                author_id=admin.id,
             )
             db.add(post)
             db.flush()
 
             db.add(
                 Comment(
-                    comment_content="첫 댓글입니다.",
-                    post_id=post.post_id,
-                    author_id=member.user_id,
+                    content="첫 댓글입니다.",
+                    post_id=post.id,
+                    author_id=member.id,
                 )
             )
-            logger.info("seed_post_created", post_id=post.post_id)
+            logger.info("seed_post_created", post_id=post.id)
 
         db.commit()
 

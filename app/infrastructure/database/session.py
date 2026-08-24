@@ -56,8 +56,8 @@ def _set_session_timezone(dbapi_connection: Any, connection_record: Any) -> None
 
 SessionLocal = sessionmaker(
     bind=engine,
-    autoflush=False,
-    autocommit=False,
+    autoflush=True,
+    autocommit=True,
     # commit 이후에도 로드된 속성을 그대로 쓰기 위해 만료시키지 않는다.
     # 기본값(True)이면 Service 의 commit 직후 응답 직렬화 시점에 재조회가 발생하고,
     # 세션이 이미 닫혔다면 DetachedInstanceError 로 터진다.
