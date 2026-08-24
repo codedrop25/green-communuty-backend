@@ -180,6 +180,7 @@ poetry run python -m scripts.seed
 
 ## 6. 동작 확인
 
+
 ```bash
 poetry run uvicorn app.main:app --reload
 ```

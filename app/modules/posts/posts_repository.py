@@ -11,7 +11,7 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
 from app.common.pagination import PageParams
-from app.modules.comments.model import Comment
+from app.modules.comments.comment_model import Comment
 from app.modules.posts.posts_image_model import PostImage
 from app.modules.posts.posts_like_model import PostLike
 from app.modules.posts.posts_model import Post

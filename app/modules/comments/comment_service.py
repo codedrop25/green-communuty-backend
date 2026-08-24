@@ -9,7 +9,7 @@ from app.core.exceptions import ForbiddenError, NotFoundError
 from app.modules.comments.comment_model import Comment
 from app.modules.comments.comment_repository import CommentRepository
 from app.modules.comments.comment_schemas import CommentCreate, CommentUpdate
-from app.modules.posts.repository import PostRepository
+from app.modules.posts.posts_repository import PostRepository
 from app.modules.users.model import User
 
 
