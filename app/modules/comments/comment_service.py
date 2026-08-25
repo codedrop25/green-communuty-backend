@@ -6,12 +6,12 @@ from sqlalchemy.orm import Session
 
 from app.common.pagination import PageParams
 from app.core.exceptions import ForbiddenError, NotFoundError
+from app.infrastructure.cache.redis import redis_client
 from app.modules.comments.comment_model import Comment
 from app.modules.comments.comment_repository import CommentRepository
 from app.modules.comments.comment_schemas import CommentCreate, CommentUpdate
 from app.modules.posts.post_repository import PostRepository
 from app.modules.users.user_model import User
-from tests.conftest import redis_client
 
 
 class CommentService:

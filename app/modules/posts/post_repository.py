@@ -7,6 +7,8 @@
        모델의 `lazy="raise"` 때문에 빠뜨리면 예외가 나므로 N+1 이 숨을 곳이 없다.
 """
 
+from typing import cast
+
 from redis import Redis
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
@@ -134,7 +136,7 @@ class PostRepository:
         key = f"post_like:{post_id}:{user_id}"  # ex) post_like:10:3
 
         # 1. Redis 의 like data 조회
-        redis_status: str | None = self._redis.get(key)
+        redis_status = cast(str | None, self._redis.get(key))
         if redis_status is not None:  # Redis 에 값이 있다면
             return redis_status == "1"  # "1"과 비교하여 True / False 반환
 

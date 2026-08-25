@@ -28,7 +28,9 @@ class TestPageResponse:
         ],
     )
     def test_total_pages_rounds_up(self, total: int, size: int, expected_pages: int) -> None:
-        response = PageResponse.create(items=[], total=total, params=PageParams(page=1, size=size))
+        response: PageResponse[str] = PageResponse.create(
+            items=[], total=total, params=PageParams(page=1, size=size)
+        )
 
         assert response.total_pages == expected_pages
 

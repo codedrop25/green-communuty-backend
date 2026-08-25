@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.common.dependencies import CurrentUser
 from app.common.pagination import PageParams
 from app.core.exceptions import ForbiddenError, NotFoundError
+from app.infrastructure.cache.redis import redis_client
 from app.modules.posts.post_model import Post
 from app.modules.posts.post_repository import PostRepository
 from app.modules.posts.post_schemas import (
@@ -26,7 +27,6 @@ from app.modules.posts.post_schemas import (
     PostUpdate,
 )
 from app.modules.users.user_model import User, UserRole
-from tests.conftest import redis_client
 
 UPLOAD_DIR = Path("uploads/posts")
 

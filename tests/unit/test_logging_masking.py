@@ -8,7 +8,7 @@ from app.core.logging_config import MASK, mask_sensitive_data
 
 
 def mask(event: dict[str, object]) -> dict[str, object]:
-    return dict(mask_sensitive_data(None, "info", event))  # type: ignore[arg-type]
+    return dict(mask_sensitive_data(None, "info", event))
 
 
 class TestMasking:
