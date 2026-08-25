@@ -16,7 +16,7 @@ from app.core.exceptions import UnauthorizedError
 from app.infrastructure.cache.redis import get_redis
 from app.modules.auth.schemas import LoginRequest, MessageResponse, TokenResponse
 from app.modules.auth.service import AuthService, IssuedTokens
-from app.modules.users.schemas import UserCreate, UserResponse
+from app.modules.users.user_schemas import UserCreate, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -147,6 +147,6 @@ def logout_all(
     Access Token 은 무상태라 만료 전까지 유효하므로,
     Access Token 수명을 짧게(기본 30분) 유지하는 것이 함께 필요하다.
     """
-    revoked = AuthService(db, redis).logout_all(current_user.id)
+    revoked = AuthService(db, redis).logout_all(current_user.user_id)
     _clear_refresh_cookie(response)
     return MessageResponse(message=f"{revoked}개의 세션이 종료되었습니다.")

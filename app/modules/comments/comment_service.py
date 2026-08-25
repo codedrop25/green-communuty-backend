@@ -9,8 +9,9 @@ from app.core.exceptions import ForbiddenError, NotFoundError
 from app.modules.comments.comment_model import Comment
 from app.modules.comments.comment_repository import CommentRepository
 from app.modules.comments.comment_schemas import CommentCreate, CommentUpdate
-from app.modules.posts.posts_repository import PostRepository
-from app.modules.users.model import User
+from app.modules.posts.post_repository import PostRepository
+from app.modules.users.user_model import User
+from tests.conftest import redis_client
 
 
 class CommentService:
@@ -22,7 +23,7 @@ class CommentService:
         self._repository = CommentRepository(db)
 
         # 게시글 확인
-        self._posts = PostRepository(db)
+        self._posts = PostRepository(db, redis_client)
 
     # 게시글 댓글 목록 조회
     def list_by_post(
@@ -95,7 +96,7 @@ class CommentService:
             content=payload.content,
             post_id=post_id,
             # 현재 로그인한 사용자 번호 저장
-            author_id=author.id,
+            author_id=author.user_id,
             # 일반 댓글이면 None, 답글이면 기존 댓글 번호 저장
             parent_comment_id=payload.parent_comment_id,
         )
@@ -183,7 +184,7 @@ class CommentService:
             raise NotFoundError("댓글을 찾을 수 없습니다.")
 
         # 댓글 작성자 확인
-        if comment.author_id != current_user.id:
+        if comment.author_id != current_user.user_id:
             raise ForbiddenError("본인이 작성한 댓글만 수정/삭제할 수 있습니다.")
 
         return comment
@@ -202,26 +203,26 @@ class CommentService:
             # @로 시작하는 경우 멘션 확인
             if word.startswith("@"):
                 # @를 제외하고 닉네임만 가져오기
-                nickname = word[1:]
+                user_nickname = word[1:]
 
                 # 닉네임이 없는 경우 넘어가기
-                if not nickname:
+                if not user_nickname:
                     continue
 
                 # 비슷한 닉네임의 사용자 목록 조회
                 users = self._repository.search_mention_users(
                     post_id,
-                    nickname,
+                    user_nickname,
                 )
 
                 # 입력한 닉네임과 같은 사용자가 있는지 확인
                 mention_user = None
 
                 for user in users:
-                    if user.nickname == nickname:
+                    if user.user_nickname == user_nickname:
                         mention_user = user
                         break
 
                 # 사용자가 없으면 멘션 불가
                 if mention_user is None:
-                    raise NotFoundError(f"멘션한 사용자 @{nickname}을 찾을 수 없습니다.")
+                    raise NotFoundError(f"멘션한 사용자 @{user_nickname}을 찾을 수 없습니다.")

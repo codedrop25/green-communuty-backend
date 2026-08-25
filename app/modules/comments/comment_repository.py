@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.common.pagination import PageParams
 from app.modules.comments.comment_model import Comment
-from app.modules.users.model import User
+from app.modules.users.user_model import User
 
 
 class CommentRepository:
@@ -178,16 +178,16 @@ class CommentRepository:
     def search_mention_users(
         self,
         post_id: int,
-        nickname: str,
+        user_nickname: str,
     ) -> list[User]:
         # 닉네임을 입력하지 않은 경우
-        if not nickname:
+        if not user_nickname:
             stmt = (
                 select(User)
                 # 댓글 작성한 사용자 조회
                 .join(
                     Comment,
-                    Comment.author_id == User.id,
+                    Comment.author_id == User.user_id,
                 )
                 .where(
                     # 현재 게시글에 댓글을 작성한 사용자 조회
@@ -209,7 +209,7 @@ class CommentRepository:
             select(User)
             .where(
                 # 입력한 글자가 포함된 닉네임 검색
-                User.nickname.contains(nickname)
+                User.user_nickname.contains(user_nickname)
             )
             # 추천 사용자 수 제한
             .limit(5)

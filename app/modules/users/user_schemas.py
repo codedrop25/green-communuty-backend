@@ -6,7 +6,7 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.core.security import BCRYPT_MAX_PASSWORD_BYTES
-from app.modules.users.model import UserRole
+from app.modules.users.user_model import UserRole
 
 # bcrypt 는 72바이트를 넘는 입력을 잘라내므로, 그 길이를 상한으로 못 박는다.
 # 상한이 없으면 "앞 72바이트만 같아도 로그인되는" 상태가 조용히 만들어진다.
@@ -18,15 +18,15 @@ NicknameStr = Annotated[str, Field(min_length=2, max_length=50)]
 class UserCreate(BaseModel):
     """회원가입 요청."""
 
-    email: EmailStr
-    password: PasswordStr
-    nickname: NicknameStr
+    user_email: EmailStr
+    user_password: PasswordStr
+    user_nickname: NicknameStr
 
 
 class UserUpdate(BaseModel):
     """프로필 수정 요청. 주어진 필드만 변경한다."""
 
-    nickname: NicknameStr | None = None
+    user_nickname: NicknameStr | None = None
 
 
 class UserResponse(BaseModel):
@@ -38,9 +38,9 @@ class UserResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
-    email: EmailStr
-    nickname: str
-    role: UserRole
-    is_active: bool
-    created_at: datetime
+    user_id: int
+    user_email: EmailStr
+    user_nickname: str
+    user_role: UserRole
+    user_is_active: bool
+    user_created_at: datetime

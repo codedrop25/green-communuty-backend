@@ -9,10 +9,10 @@
 from fastapi import APIRouter
 
 from app.modules.auth.router import router as auth_router
-from app.modules.menus.menu_router import router as menus_router
 from app.modules.comments.comment_router import router as comments_router
-from app.modules.posts.posts_router import router as posts_router
-from app.modules.users.router import router as users_router
+from app.modules.menus.menu_router import router as menus_router
+from app.modules.posts.post_router import router as posts_router
+from app.modules.users.user_router import router as users_router
 
 api_router = APIRouter()
 

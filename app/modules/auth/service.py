@@ -26,10 +26,10 @@ from app.core.security import (
     verify_password,
 )
 from app.modules.auth.token_store import RefreshTokenStore, TokenState
-from app.modules.users.model import User
-from app.modules.users.repository import UserRepository
-from app.modules.users.schemas import UserCreate
-from app.modules.users.service import UserService
+from app.modules.users.user_model import User
+from app.modules.users.user_repository import UserRepository
+from app.modules.users.user_schemas import UserCreate
+from app.modules.users.user_service import UserService
 
 logger = get_logger(__name__)
 
@@ -70,26 +70,26 @@ class AuthService:
         # 유저가 없어도 해시 검증을 수행해 응답을 동일하게 맞춘다.
         password_ok = verify_password(
             password,
-            user.password_hash if user is not None else _DUMMY_PASSWORD_HASH,
+            user.user_password_hash if user is not None else _DUMMY_PASSWORD_HASH,
         )
 
         if user is None or not password_ok:
             logger.warning("login_failed", email=email, reason="invalid_credentials")
             raise UnauthorizedError("이메일 또는 비밀번호가 올바르지 않습니다.")
 
-        if not user.is_active:
-            logger.warning("login_failed", user_id=user.id, reason="inactive")
+        if not user.user_is_active:
+            logger.warning("login_failed", user_id=user.user_id, reason="inactive")
             raise UnauthorizedError("이메일 또는 비밀번호가 올바르지 않습니다.")
 
         # 정상 로그인했으므로 실패 카운터를 비운다.
         # 이것이 없으면 정상 사용자가 오타 몇 번으로 윈도우 내내 잠긴다.
         self._reset_login_rate_limit(email, client_ip)
 
-        logger.info("login_succeeded", user_id=user.id)
-        return self._issue_tokens(user.id)
+        logger.info("login_succeeded", user_id=user.user_id)
+        return self._issue_tokens(user.user_id)
 
     def _check_login_rate_limit(self, email: str, client_ip: str) -> None:
-        """이메일과 IP 두 축으로 카운트한다 (PLAN.md 4-3).
+        """이메일과 IP 두 축으로 카운트한다.
 
         이메일만 세면 공격자가 계정을 바꿔가며 우회하고,
         IP 만 세면 분산된 공격이 통과한다.
@@ -149,7 +149,7 @@ class AuthService:
             raise UnauthorizedError("세션이 만료되었습니다. 다시 로그인해주세요.")
 
         user = self._users.get_by_id(payload.user_id)
-        if user is None or not user.is_active:
+        if user is None or not user.user_is_active:
             self._token_store.revoke_all(payload.user_id)
             raise UnauthorizedError("세션이 만료되었습니다. 다시 로그인해주세요.")
 
@@ -157,8 +157,8 @@ class AuthService:
         remaining = int((payload.expires_at - datetime.now(UTC)).total_seconds())
         self._token_store.rotate(payload.user_id, payload.jti, remaining)
 
-        logger.info("token_refreshed", user_id=user.id)
-        return self._issue_tokens(user.id)
+        logger.info("token_refreshed", user_id=user.user_id)
+        return self._issue_tokens(user.user_id)
 
     # ------------------------------------------------------------------ 로그아웃
 

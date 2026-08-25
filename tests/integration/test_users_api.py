@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.modules.users.model import User, UserRole
+from app.modules.users.user_model import User, UserRole
 from tests.integration.conftest import API, DEFAULT_PASSWORD
 
 pytestmark = pytest.mark.integration
@@ -84,8 +84,8 @@ class TestAdminOnlyList:
         signup: Callable[..., dict[str, str]],
     ) -> None:
         signup("admin@example.com", "관리자")
-        user = db_session.query(User).filter(User.email == "admin@example.com").one()
-        user.role = UserRole.ADMIN
+        user = db_session.query(User).filter(User.user_email == "admin@example.com").one()
+        user.user_role = UserRole.ADMIN
         db_session.commit()
 
         # 역할 변경이 반영된 토큰을 다시 받는다.

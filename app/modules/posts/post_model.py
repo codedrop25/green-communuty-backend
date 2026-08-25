@@ -16,8 +16,8 @@ class Post(Base, TimestampMixin, SoftDeleteMixin):
     # table 이름
     __tablename__ = "posts"
 
+    # 게시글 번호, 게시글 제목, 게시글 내용
     post_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-
     post_title: Mapped[str] = mapped_column(String(200), nullable=False)
     post_content: Mapped[str] = mapped_column(Text, nullable=False)
 
@@ -30,6 +30,9 @@ class Post(Base, TimestampMixin, SoftDeleteMixin):
 
     # 조회수 컬럼
     post_view_count: Mapped[int] = mapped_column(nullable=False, default=0)
+
+    # # 게시글 상태 [active, delete]
+    # post_status: Mapped[str] = mapped_column(String(30), nullable=True)
 
     # * representation, 객체를 개발자가 확인하기 좋은 문자열 형태로 표현하는 특수 메서드
     def __repr__(self) -> str:

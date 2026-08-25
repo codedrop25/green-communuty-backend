@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, UploadFile, status
 
 from app.common.dependencies import CurrentUser, DbSession
 from app.common.pagination import PageParams, PageResponse
-from app.modules.posts.posts_schemas import (
+from app.modules.posts.post_schemas import (
     PostCreate,
     PostDetailResponse,
     PostImageResponse,
@@ -14,7 +14,7 @@ from app.modules.posts.posts_schemas import (
     PostSummaryResponse,
     PostUpdate,
 )
-from app.modules.posts.posts_service import PostService
+from app.modules.posts.post_service import PostService
 
 router = APIRouter(prefix="/posts", tags=["posts"])
 
@@ -73,11 +73,11 @@ def update_post(
 
 
 # 게시글 삭제
-# 사용 지양
-@router.delete(
+# 사용 지양 -> 8.21) patch 요청으로 변경
+@router.patch(
     "/{post_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="게시글 삭제 (논리 삭제)",
+    summary="게시글 삭제 (논리적 삭제 상태)",
 )
 def delete_post(post_id: int, current_user: CurrentUser, db: DbSession) -> None:
     PostService(db).delete(post_id, current_user)

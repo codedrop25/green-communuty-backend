@@ -19,8 +19,8 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import ForbiddenError, UnauthorizedError
 from app.core.security import TokenType, decode_token
 from app.infrastructure.database.session import get_db
-from app.modules.users.model import User, UserRole
-from app.modules.users.repository import UserRepository
+from app.modules.users.user_model import User, UserRole
+from app.modules.users.user_repository import UserRepository
 
 # auto_error=False 로 두고 직접 예외를 던진다.
 # 기본값(True)은 FastAPI 의 HTTPException 을 발생시켜 우리 표준 오류 포맷을 우회한다.
@@ -47,7 +47,7 @@ def get_current_user(
     if user is None:
         # 토큰은 유효하지만 유저가 삭제된 경우.
         raise UnauthorizedError("인증이 필요합니다.")
-    if not user.is_active:
+    if not user.user_is_active:
         raise ForbiddenError("비활성화된 계정입니다.")
 
     return user
@@ -67,7 +67,7 @@ def require_role(*roles: UserRole) -> Callable[[User], User]:
     """
 
     def dependency(current_user: CurrentUser) -> User:
-        if current_user.role not in roles:
+        if current_user.user_role not in roles:
             raise ForbiddenError("접근 권한이 없습니다.")
         return current_user
 

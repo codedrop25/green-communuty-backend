@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, EmailStr, Field
 
-from app.modules.users.schemas import PasswordStr
+from app.modules.users.user_schemas import PasswordStr
 
 
 class LoginRequest(BaseModel):

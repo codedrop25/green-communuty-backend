@@ -9,9 +9,9 @@ from fastapi import APIRouter, Depends, status
 
 from app.common.dependencies import CurrentUser, DbSession, require_role
 from app.common.pagination import PageParams, PageResponse
-from app.modules.users.model import UserRole
-from app.modules.users.schemas import UserResponse, UserUpdate
-from app.modules.users.service import UserService
+from app.modules.users.user_model import UserRole
+from app.modules.users.user_schemas import UserResponse, UserUpdate
+from app.modules.users.user_service import UserService
 
 router = APIRouter(prefix="/users", tags=["users"])
 

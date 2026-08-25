@@ -15,9 +15,9 @@ from sqlalchemy.orm import Session
 from app.common.dependencies import CurrentUser
 from app.common.pagination import PageParams
 from app.core.exceptions import ForbiddenError, NotFoundError
-from app.modules.posts.posts_model import Post
-from app.modules.posts.posts_repository import PostRepository
-from app.modules.posts.posts_schemas import (
+from app.modules.posts.post_model import Post
+from app.modules.posts.post_repository import PostRepository
+from app.modules.posts.post_schemas import (
     PostCreate,
     PostDetailResponse,
     PostImageResponse,
@@ -25,7 +25,8 @@ from app.modules.posts.posts_schemas import (
     PostSummaryResponse,
     PostUpdate,
 )
-from app.modules.users.model import User, UserRole
+from app.modules.users.user_model import User, UserRole
+from tests.conftest import redis_client
 
 UPLOAD_DIR = Path("uploads/posts")
 
@@ -33,7 +34,7 @@ UPLOAD_DIR = Path("uploads/posts")
 class PostService:
     def __init__(self, db: Session) -> None:
         self._db = db
-        self._repository = PostRepository(db)
+        self._repository = PostRepository(db, redis_client)
 
     # ------------------------------------------------------------------ 조회
 
@@ -55,22 +56,17 @@ class PostService:
 
         # 좋아요 조회
         post_like_count = self._repository.count_likes(post_id)
-        is_liked = (
-            self._repository.get_like(
-                post_id,
-                current_user.user_id,
-            )
-            is not None
-        )
+        is_liked = self._repository.get_like(post_id, current_user.user_id)
 
         return PostDetailResponse.from_entities(
             post,
             author,
+            post.post_view_count,
             post_like_count,
             is_liked,
         )
 
-    def list_posts(self, params: PageParams) -> tuple[list[Post], int]:
+    def list_posts(self, params: PageParams) -> tuple[list[tuple[Post, User]], int]:
         return self._repository.list_paginated(params)
 
     # ------------------------------------------------------------------ 생성/수정/삭제
@@ -99,8 +95,9 @@ class PostService:
         # 수정 응답도 상세 포맷이므로 연관 엔티티가 로드된 객체를 다시 가져온다.
         return self.get_detail(post_id, current_user)
 
+    # 8.21) patch 요청으로 변경 (status=delete)
     def delete(self, post_id: int, current_user: User) -> None:
-        """논리 삭제."""
+        """논리적 삭제 상태"""
         post = self._get_owned(post_id, current_user)
         post.deleted_at = datetime.now(UTC).replace(tzinfo=None)
         self._repository.flush()
@@ -118,12 +115,12 @@ class PostService:
             raise NotFoundError("게시글을 찾을 수 없습니다.")
 
         # 관리자는 신고 처리 등을 위해 타인의 글도 다룰 수 있다.
-        if post.author_id != current_user.user_id and current_user.role != UserRole.ADMIN:
+        if post.author_id != current_user.user_id and current_user.user_role != UserRole.ADMIN:
             raise ForbiddenError("본인이 작성한 게시글만 수정/삭제할 수 있습니다.")
 
         return post
 
-    # ------------------------------------------------------------------ 부가기능
+    # ------------------------------------------------------------------ 좋아요
 
     # 좋아요 누르기
     def like_post(
@@ -143,34 +140,28 @@ class PostService:
             post_id,
             current_user.user_id,
         )
-        if existing_like is not None:
+        if existing_like:
             return
 
-        # 3. 좋아요 저장
+        # 3. Redis 에 좋아요 상태 임시 저장
         self._repository.add_like(
             post_id,
             current_user.user_id,
         )
-        self._db.commit()
 
     # 좋아요 취소
-    def unlike_post(
-        self,
-        post_id: int,
-        current_user: CurrentUser,
-    ) -> None:
+    def unlike_post(self, post_id: int, current_user: CurrentUser) -> None:
         """게시글 좋아요 취소."""
 
-        like = self._repository.get_like(
-            post_id,
-            current_user.user_id,
-        )
-
-        if like is None:
+        # 1. 해당 게시글에 누른 좋아요 데이터를 조회
+        like = self._repository.get_like(post_id, current_user.user_id)
+        if not like:
             return
 
-        self._repository.delete_like(like)
-        self._db.commit()
+        # 2. Redis 에 좋아요 상태 임시 저장
+        self._repository.delete_like(post_id, current_user.user_id)
+
+    # ------------------------------------------------------------------ 공유
 
     # 공유 기능
     def get_share_url(self, post_id: int) -> PostShareResponse:
@@ -183,6 +174,8 @@ class PostService:
         return PostShareResponse(
             share_url=share_url,
         )
+
+    # ------------------------------------------------------------------ 이미지
 
     # 이미지 업로드 기능
     def upload_image(

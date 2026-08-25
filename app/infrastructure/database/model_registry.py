@@ -15,11 +15,11 @@ Alembic 은 `Base.metadata` 와 실제 DB 스키마를 비교해 마이그레이
 """
 
 from app.infrastructure.database.base import Base
-from app.modules.menus.menu_model import Menu
 from app.modules.comments.comment_model import Comment
-from app.modules.posts.posts_image_model import PostImage
-from app.modules.posts.posts_like_model import PostLike
-from app.modules.posts.posts_model import Post
-from app.modules.users.model import User
+from app.modules.menus.menu_model import Menu
+from app.modules.posts.post_image_model import PostImage
+from app.modules.posts.post_like_model import PostLike
+from app.modules.posts.post_model import Post
+from app.modules.users.user_model import User
 
-__all__ = ["Base", "Comment", "Menu", "Post", "User"]
+__all__ = ["Base", "Comment", "Menu", "Post", "PostImage", "PostLike", "User"]

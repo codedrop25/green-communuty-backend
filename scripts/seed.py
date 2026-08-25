@@ -11,9 +11,9 @@ from app.core.logging_config import configure_logging, get_logger
 from app.core.security import hash_password
 from app.infrastructure.database.session import SessionLocal
 from app.modules.comments.comment_model import Comment
-from app.modules.posts.posts_model import Post
-from app.modules.users.model import User, UserRole
-from app.modules.users.repository import UserRepository
+from app.modules.posts.post_model import Post
+from app.modules.users.user_model import User, UserRole
+from app.modules.users.user_repository import UserRepository
 
 logger = get_logger(__name__)
 
@@ -52,7 +52,7 @@ def seed() -> None:
             post = Post(
                 title="환영합니다 🎉",
                 content="이 게시글은 시드 스크립트가 생성했습니다.",
-                author_id=admin.id,
+                author_id=admin.user_id,
             )
             db.add(post)
             db.flush()
@@ -60,11 +60,11 @@ def seed() -> None:
             db.add(
                 Comment(
                     content="첫 댓글입니다.",
-                    post_id=post.id,
-                    author_id=member.id,
+                    post_id=post.post_id,
+                    author_id=member.user_id,
                 )
             )
-            logger.info("seed_post_created", post_id=post.id)
+            logger.info("seed_post_created", post_id=post.post_id)
 
         db.commit()
 

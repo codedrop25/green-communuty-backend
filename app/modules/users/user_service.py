@@ -11,9 +11,9 @@ from sqlalchemy.orm import Session
 from app.common.pagination import PageParams
 from app.core.exceptions import ConflictError, NotFoundError
 from app.core.security import hash_password
-from app.modules.users.model import User
-from app.modules.users.repository import UserRepository
-from app.modules.users.schemas import UserCreate, UserUpdate
+from app.modules.users.user_model import User
+from app.modules.users.user_repository import UserRepository
+from app.modules.users.user_schemas import UserCreate, UserUpdate
 
 
 class UserService:
@@ -41,13 +41,13 @@ class UserService:
         동시 요청으로 사전 조회를 통과하더라도 DB 의 UNIQUE 제약이 최종 방어선이 되며,
         그 경우 IntegrityError 가 전역 핸들러에서 처리된다.
         """
-        if self._repository.exists_by_email(payload.email):
+        if self._repository.exists_by_email(payload.user_email):
             raise ConflictError("이미 사용 중인 이메일입니다.")
 
         user = User(
-            email=payload.email,
-            password_hash=hash_password(payload.password),
-            nickname=payload.nickname,
+            user_email=payload.user_email,
+            user_password_hash=hash_password(payload.user_password),
+            user_nickname=payload.user_nickname,
         )
         self._repository.add(user)
         self._db.commit()
@@ -69,6 +69,6 @@ class UserService:
 
     def deactivate(self, user: User) -> None:
         """계정 비활성화 (PLAN.md 6-3: User 는 삭제하지 않는다)."""
-        user.is_active = False
+        user.user_is_active = False
         self._repository.flush()
         self._db.commit()

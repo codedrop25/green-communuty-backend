@@ -18,7 +18,8 @@ SQLite 로 대체하지 않는 이유: 타입/FK/트랜잭션 동작이 MySQL �
 "테스트는 통과하는데 운영에서 깨지는" 상황을 만든다.
 """
 
-from collections.abc import Generator
+from collections.abc import Callable, Generator
+from typing import Any, TypeVar, cast
 
 import pytest
 from fastapi import FastAPI
@@ -29,8 +30,20 @@ from sqlalchemy.orm import Session, sessionmaker
 from testcontainers.mysql import MySqlContainer
 from testcontainers.redis import RedisContainer
 
+F = TypeVar("F", bound=Callable[..., Any])
 
-@pytest.fixture(scope="session")
+fixture = cast(
+    Callable[[F], F],
+    pytest.fixture(),
+)
+
+session_fixture = cast(
+    Callable[[F], F],
+    pytest.fixture(scope="session"),
+)
+
+
+@session_fixture
 def mysql_container() -> Generator[MySqlContainer]:
     """세션 전체에서 공유하는 MySQL 컨테이너.
 
@@ -47,13 +60,13 @@ def mysql_container() -> Generator[MySqlContainer]:
         yield started
 
 
-@pytest.fixture(scope="session")
+@fixture
 def redis_container() -> Generator[RedisContainer]:
     with RedisContainer("redis:7-alpine") as container:
         yield container
 
 
-@pytest.fixture(scope="session")
+@fixture
 def engine(mysql_container: MySqlContainer) -> Generator[Engine]:
     """테이블이 생성된 테스트 엔진.
 
@@ -73,7 +86,7 @@ def engine(mysql_container: MySqlContainer) -> Generator[Engine]:
     test_engine.dispose()
 
 
-@pytest.fixture
+@fixture
 def db_session(engine: Engine) -> Generator[Session]:
     """테스트 하나당 트랜잭션 하나.
 
@@ -101,7 +114,7 @@ def db_session(engine: Engine) -> Generator[Session]:
     connection.close()
 
 
-@pytest.fixture
+@fixture
 def redis_client(redis_container: RedisContainer) -> Generator[Redis]:
     """테스트마다 비워지는 Redis 클라이언트.
 
@@ -120,7 +133,7 @@ def redis_client(redis_container: RedisContainer) -> Generator[Redis]:
     client.close()
 
 
-@pytest.fixture
+@fixture
 def app(db_session: Session, redis_client: Redis) -> Generator[FastAPI]:
     """DB/Redis 의존성이 테스트용으로 교체된 앱."""
     from app.infrastructure.cache.redis import get_redis
@@ -141,7 +154,7 @@ def app(db_session: Session, redis_client: Redis) -> Generator[FastAPI]:
     fastapi_app.dependency_overrides.clear()
 
 
-@pytest.fixture
+@fixture
 def client(app: FastAPI) -> Generator[TestClient]:
     with TestClient(app) as test_client:
         yield test_client

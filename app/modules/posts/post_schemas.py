@@ -5,6 +5,9 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.modules.posts.post_model import Post
+from app.modules.users.user_model import User
+
 TitleStr = Annotated[str, Field(min_length=1, max_length=200)]
 ContentStr = Annotated[str, Field(min_length=1)]
 
@@ -59,11 +62,10 @@ class PostSummaryResponse(BaseModel):
     created_at: datetime
 
     @classmethod
-    def from_entities(cls, post, author) -> "PostSummaryResponse":
+    def from_entities(cls, post: Post, author: User) -> "PostSummaryResponse":
         return cls(
             post_id=post.post_id,
             post_title=post.post_title,
-            post_content=post.post_content,
             author=AuthorSummary(
                 user_id=author.user_id,
                 user_nickname=author.user_nickname,
@@ -94,8 +96,9 @@ class PostDetailResponse(BaseModel):
     @classmethod
     def from_entities(
         cls,
-        post,
-        author,
+        post: Post,
+        author: User,
+        post_view_count: int,
         post_like_count: int,
         is_liked: bool,
     ) -> "PostDetailResponse":
@@ -103,6 +106,7 @@ class PostDetailResponse(BaseModel):
             post_id=post.post_id,
             post_title=post.post_title,
             post_content=post.post_content,
+            post_view_count=post_view_count,
             post_like_count=post_like_count,
             is_liked=is_liked,
             author=AuthorSummary(

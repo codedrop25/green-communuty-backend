@@ -58,7 +58,7 @@ def hash_password(password: str) -> str:
         raise ValueError(
             f"비밀번호는 UTF-8 기준 {BCRYPT_MAX_PASSWORD_BYTES}바이트를 넘을 수 없습니다."
         )
-    return bcrypt.hashpw(password_bytes, bcrypt.gensalt()).decode("utf-8")
+    return str(bcrypt.hashpw(password_bytes, bcrypt.gensalt()).decode("utf-8"))
 
 
 def verify_password(password: str, password_hash: str) -> bool:
@@ -72,7 +72,7 @@ def verify_password(password: str, password_hash: str) -> bool:
     if len(password_bytes) > BCRYPT_MAX_PASSWORD_BYTES:
         return False
     try:
-        return bcrypt.checkpw(password_bytes, password_hash.encode("utf-8"))
+        return bool(bcrypt.checkpw(password_bytes, password_hash.encode("utf-8")))
     except ValueError:
         return False
 
