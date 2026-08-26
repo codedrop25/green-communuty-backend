@@ -45,6 +45,7 @@ class PostRepository:
         # * scalars(statement) : 쿼리 실행 + Post 객체만 추출
         # * one_or_none() : 1개면 반환, 0개면 None / 2개 이상이면 PK 예외 발생
         return self._db.scalars(statement).one_or_none()
+        # todo 개발자가 통제할 수 없는 오류가 나는 상황은 지양, 그전에 유효성 검사등을 하는걸 추천
 
     # post 상세 조회
     # 8.02) 코멘트까지 불러오는 코드 추가 필요
@@ -98,7 +99,6 @@ class PostRepository:
             .limit(params.limit)
         )
         rows = self._db.execute(statement).all()
-
         result = [(row[0], row[1]) for row in rows]
 
         return result, total

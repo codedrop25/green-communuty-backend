@@ -56,7 +56,7 @@ def _set_session_timezone(dbapi_connection: Any, connection_record: Any) -> None
 
 SessionLocal = sessionmaker(
     bind=engine,
-    autoflush=True,
+    # autoflush=True,
     # autocommit=True,          # 8.25) SQLAlchemy 2.x 부터는 지원하지 않는 코드
     # commit 이후에도 로드된 속성을 그대로 쓰기 위해 만료시키지 않는다.
     # 기본값(True)이면 Service 의 commit 직후 응답 직렬화 시점에 재조회가 발생하고,

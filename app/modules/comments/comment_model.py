@@ -22,7 +22,7 @@ class Comment(Base, TimestampMixin, SoftDeleteMixin):
     )
 
     # 댓글 내용
-    content: Mapped[str] = mapped_column(
+    comment_content: Mapped[str] = mapped_column(
         # 긴 문자열 저장
         Text,
         # 필수값
