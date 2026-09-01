@@ -44,6 +44,7 @@ structlog = "^25.4.0"
 # --- 스토리지 ---
 boto3 = "^1.40.0"
 python-multipart = "^0.0.32"
+apscheduler = "^3.11.3"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.0"

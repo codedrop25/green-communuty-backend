@@ -3,9 +3,8 @@
 조립 순서와 그 이유를 한 곳에서 볼 수 있도록, 설정은 전부 함수로 분리해 두었다.
 """
 
-import asyncio
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager, suppress
+from contextlib import asynccontextmanager
 
 from anyio import to_thread
 from fastapi import FastAPI
@@ -17,7 +16,7 @@ from app.core.config import settings
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging_config import configure_logging, get_logger
 from app.core.middleware import RequestContextMiddleware
-from app.modules.posts.post_like_sync import post_like_sync
+from app.infrastructure.scheduler.scheduler import shutdown_scheduler, start_scheduler
 
 logger = get_logger(__name__)
 
@@ -38,18 +37,15 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
         db_pool_capacity=settings.DB_POOL_SIZE + settings.DB_MAX_OVERFLOW,
     )
 
-    # 8.25) 추가: 좋아요 5분 동기화 작업 시작
-    post_like_sync_task = asyncio.create_task(post_like_sync())
+    # 8.25) 추가: 좋아요 DB 동기화 작업 시작
+    # 9.01) APScheduler 라이브러리 적용
+    start_scheduler()
 
     # 8.25) 변경: yield 를 try 로 감쌈
     try:
         yield
     finally:
-        post_like_sync_task.cancel()
-
-        with suppress(asyncio.CancelledError):  # 코드 안에서 해당 에러가 일어날 경우 무시해라
-            await post_like_sync_task
-
+        shutdown_scheduler()
         logger.info("application_stopped")
 
 

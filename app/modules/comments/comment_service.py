@@ -88,12 +88,12 @@ class CommentService:
         # 댓글 내용에 있는 멘션 확인
         self._validate_mentions(
             post_id,
-            payload.content,
+            payload.comment_content,
         )
 
         # 저장할 댓글 생성
         comment = Comment(
-            content=payload.content,
+            comment_content=payload.comment_content,
             post_id=post_id,
             # 현재 로그인한 사용자 번호 저장
             author_id=author.user_id,
@@ -126,11 +126,11 @@ class CommentService:
         # 수정한 댓글 내용의 멘션 확인
         self._validate_mentions(
             comment.post_id,
-            payload.content,
+            payload.comment_content,
         )
 
         # 댓글 내용 수정
-        comment.content = payload.content
+        comment.comment_content = payload.comment_content
 
         # 수정 내용 DB 반영
         self._repository.flush()
@@ -193,10 +193,10 @@ class CommentService:
     def _validate_mentions(
         self,
         post_id: int,
-        content: str,
+        comment_content: str,
     ) -> None:
         # 댓글 내용을 띄어쓰기 기준으로 나눔
-        words = content.split()
+        words = comment_content.split()
 
         # 댓글 내용을 하나씩 확인
         for word in words:

@@ -19,7 +19,7 @@ class CommentCreate(BaseModel):
     """댓글 및 대댓글 작성 요청."""
 
     # 댓글 내용
-    content: CommentContentStr
+    comment_content: CommentContentStr
 
     # 부모 댓글 번호
     # 일반 댓글은 NULL, 대댓글이면 부모 댓글 번호 저장
@@ -30,7 +30,7 @@ class CommentUpdate(BaseModel):
     """댓글 수정 요청."""
 
     # 수정할 댓글 내용
-    content: CommentContentStr
+    comment_content: CommentContentStr
 
 
 class CommentResponse(BaseModel):
@@ -49,7 +49,7 @@ class CommentResponse(BaseModel):
     author_id: int
 
     # 댓글 내용
-    content: str
+    comment_content: str
 
     # 부모 댓글 번호
     # 일반 댓글은 NULL, 답글이면 부모 댓글 번호
