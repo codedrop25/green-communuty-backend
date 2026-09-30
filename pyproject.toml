@@ -45,6 +45,7 @@ structlog = "^25.4.0"
 boto3 = "^1.40.0"
 python-multipart = "^0.0.32"
 apscheduler = "^3.11.3"
+pillow = "^12.3.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.0"
@@ -123,7 +124,11 @@ show_error_codes = true
 
 [[tool.mypy.overrides]]
 # 타입 스텁을 제공하지 않는 서드파티.
-module = ["testcontainers.*"]
+module = [
+    "testcontainers.*",
+    "apscheduler",
+    "apscheduler.*",
+]
 ignore_missing_imports = true
 
 

@@ -1,6 +1,6 @@
 """S3 호환 오브젝트 스토리지 클라이언트.
 
-PLAN.md 6-1: 이번 범위에서는 **인프라 스텁**이다.
+이번 범위에서는 **인프라 스텁**이다.
 연결 설정과 기본 업로드/조회 메서드까지만 제공하고,
 업로드 API 엔드포인트는 구현하지 않는다.
 
@@ -16,6 +16,8 @@ from botocore.config import Config
 
 from app.core.config import settings
 from app.core.exceptions import StorageNotConfiguredError
+from app.infrastructure.storage.base import Storage
+from app.infrastructure.storage.r2 import R2Storage
 
 if TYPE_CHECKING:
     from types_boto3_s3.client import S3Client
@@ -47,7 +49,7 @@ def _build_client() -> "S3Client":
     )
 
 
-class S3Storage:
+class S3Storage(Storage):
     """오브젝트 스토리지 래퍼.
 
     boto3 를 직접 쓰지 않고 한 겹 감싸는 이유는, 버킷명·에러 처리 같은
@@ -78,14 +80,17 @@ class S3Storage:
             ExpiresIn=expires_in,
         )
 
-    def delete(self, key: str) -> None:
-        self._client.delete_object(Bucket=self._bucket, Key=key)
+    # def delete(self, key: str) -> None:
+    #     self._client.delete_object(Bucket=self._bucket, Key=key)
 
 
-def get_storage() -> S3Storage:
+def get_storage() -> Storage:
     """스토리지 의존성.
 
     S3 설정이 없으면 `StorageNotConfiguredError` 가 발생하고,
     전역 예외 핸들러가 503 으로 변환한다.
     """
+    if settings.STORAGE_PROVIDER == "r2":
+        return R2Storage()
+
     return S3Storage()

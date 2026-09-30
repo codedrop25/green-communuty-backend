@@ -84,20 +84,38 @@ class Settings(BaseSettings):
     REDIS_DB: int = 0
 
     # ---------------------------------------------------------------- S3
+    # 9.06 추가: 사용할 오브젝트 스토리지 종류를 선택, .env 에 값이 없으면 기본값 s3 가 사용됨.
+    STORAGE_PROVIDER: Literal["r2", "s3"] = "s3"
+
     S3_ENDPOINT_URL: str | None = None
     S3_ACCESS_KEY: SecretStr | None = None
     S3_SECRET_KEY: SecretStr | None = None
     S3_BUCKET: str | None = None
     S3_REGION: str = "ap-northeast-2"
 
-    # ================================================================ 정규화
+    # ---------------------------------------------------------------- R2
+    # 9.06 추가: R2 스토리지 사용을 위한 설정 코드
+    R2_ACCOUNT_ID: str | None = None  # Cloudflare 계정을 구분하는 ID
+    R2_ACCESS_KEY_ID: SecretStr | None = None  # R2 API 인증에 사용하는 접근 키
+    R2_SECRET_ACCESS_KEY: SecretStr | None = None  # R2 API 인증에 사용하는 비밀 키
+    R2_BUCKET_NAME: str | None = None  # 이미지를 저장할 R2 버킷 이름
+    R2_PUBLIC_URL: str | None = None  # 브라우저에서 이미지를 조회할 공개 주소
+    R2_REGION: str = "auto"  # boto3가 요구하는 지역값, R2는 auto 사용.
 
+    # ================================================================ 정규화
+    # 빈 문자열을 None 으로 바꾸는 메서드
     @field_validator(
         "REDIS_PASSWORD",
         "S3_ENDPOINT_URL",
         "S3_ACCESS_KEY",
         "S3_SECRET_KEY",
         "S3_BUCKET",
+        "R2_ACCOUNT_ID",
+        "R2_ACCESS_KEY_ID",
+        "R2_SECRET_ACCESS_KEY",
+        "R2_BUCKET_NAME",
+        "R2_PUBLIC_URL",
+        "R2_REGION",
         mode="before",
     )
     @classmethod

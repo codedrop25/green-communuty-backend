@@ -14,10 +14,12 @@ from typing import Annotated
 
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from redis import Redis
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import ForbiddenError, UnauthorizedError
 from app.core.security import TokenType, decode_token
+from app.infrastructure.cache.redis import get_redis
 from app.infrastructure.database.session import get_db
 from app.modules.users.user_model import User, UserRole
 from app.modules.users.user_repository import UserRepository
@@ -27,6 +29,8 @@ from app.modules.users.user_repository import UserRepository
 _bearer_scheme = HTTPBearer(auto_error=False, description="Access Token (Bearer)")
 
 DbSession = Annotated[Session, Depends(get_db)]
+# FastAPI가 get_redis()를 호출하고 그 반환값을 매개변수에 넣어준다.
+RedisClient = Annotated[Redis, Depends(get_redis)]
 
 
 def get_current_user(

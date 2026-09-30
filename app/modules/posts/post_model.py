@@ -2,7 +2,7 @@
 
 # from typing import TYPE_CHECKING
 
-from sqlalchemy import String, Text
+from sqlalchemy import Enum, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 # * SQLAlchemy 에게 이 파일은 ORM 모델이라고 알려주는 코드, SpringBoot 의 @Entity 와 비슷한 역할
@@ -11,7 +11,7 @@ from app.infrastructure.database.mixins import SoftDeleteMixin, TimestampMixin
 
 
 class Post(Base, TimestampMixin, SoftDeleteMixin):
-    """게시글."""
+    """게시글 table"""
 
     # table 이름
     __tablename__ = "posts"
@@ -31,8 +31,14 @@ class Post(Base, TimestampMixin, SoftDeleteMixin):
     # 조회수 컬럼
     post_view_count: Mapped[int] = mapped_column(nullable=False, default=0)
 
-    # # 게시글 상태 [active, delete]
-    # post_status: Mapped[str] = mapped_column(String(30), nullable=True)
+    # 게시글 상태 [PUBLISHED, HIDDEN, DELETED]
+    post_status: Mapped[str] = mapped_column(
+        Enum("PUBLISHED", "HIDDEN", "DELETED", name="post_status"),
+        nullable=False,
+        default="PUBLISHED",
+        server_default="PUBLISHED",
+        index=True,
+    )
 
     # * representation, 객체를 개발자가 확인하기 좋은 문자열 형태로 표현하는 특수 메서드
     def __repr__(self) -> str:

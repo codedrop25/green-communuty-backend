@@ -4,8 +4,14 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, UploadFile, status
 
-from app.common.dependencies import CurrentUser, DbSession
+from app.common.dependencies import (
+    CurrentUser,
+    DbSession,
+    RedisClient,
+)
 from app.common.pagination import PageParams, PageResponse
+from app.infrastructure.storage.base import Storage
+from app.infrastructure.storage.s3 import get_storage
 from app.modules.posts.post_schemas import (
     PostCreate,
     PostDetailResponse,
@@ -16,35 +22,77 @@ from app.modules.posts.post_schemas import (
 )
 from app.modules.posts.post_service import PostService
 
-router = APIRouter(prefix="/posts", tags=["posts"])
+# get_storage()가 반환하는 S3Storage 또는 R2Storage를
+# FastAPI가 자동으로 주입하도록 만든 자료형이다.
+StorageClient = Annotated[Storage, Depends(get_storage)]
 
 
-# 게시글 전체 조회 API
-@router.get("", response_model=PageResponse[PostSummaryResponse], summary="게시글 목록")
+router = APIRouter(
+    prefix="/posts",
+    tags=["posts"],
+)
+
+
+# ------------------------------------------------------------------ 조회
+
+
+@router.get(
+    "",
+    response_model=PageResponse[PostSummaryResponse],
+    summary="게시글 목록",
+)
 def list_posts(
     params: Annotated[PageParams, Depends()],
+    current_user: CurrentUser,
     db: DbSession,
+    redis: RedisClient,
+    storage: StorageClient,
 ) -> PageResponse[PostSummaryResponse]:
-    posts, total = PostService(db).list_posts(params)
+    """게시글 목록을 조회한다."""
+
+    posts, total = PostService(
+        db,
+        redis,
+        storage,
+    ).list_posts(
+        params,
+        current_user,
+    )
+
     return PageResponse.create(
-        items=[PostSummaryResponse.model_validate(post) for post in posts],
+        items=[PostSummaryResponse.from_entities(post, author) for post, author in posts],
         total=total,
         params=params,
     )
 
 
-# 게시글 상세 조회 API
-@router.get("/{post_id}", response_model=PostDetailResponse, summary="게시글 상세 (댓글 포함)")
+@router.get(
+    "/{post_id}",
+    response_model=PostDetailResponse,
+    summary="게시글 상세 (댓글 포함)",
+)
 def get_post(
     post_id: int,
+    current_user: CurrentUser,
     db: DbSession,
-    current_user: CurrentUser,  # 조회수 증감 기능에서 작성자의 조회인지를 구분하기 위해 사용
+    redis: RedisClient,
+    storage: StorageClient,
 ) -> PostDetailResponse:
-    post = PostService(db).get_detail(post_id, current_user)  # service 호출
-    return post
+    """게시글 상세 정보를 조회한다."""
+
+    return PostService(
+        db,
+        redis,
+        storage,
+    ).get_detail(
+        post_id,
+        current_user,
+    )
 
 
-# 게시글 생성 API
+# ---------------------------------------------------------- 생성/수정/삭제
+
+
 @router.post(
     "",
     response_model=PostSummaryResponse,
@@ -55,38 +103,74 @@ def create_post(
     payload: PostCreate,
     current_user: CurrentUser,
     db: DbSession,
+    redis: RedisClient,
+    storage: StorageClient,
 ) -> PostSummaryResponse:
-    post = PostService(db).create(current_user, payload)
-    return PostSummaryResponse.model_validate(post)
+    """새로운 게시글을 작성한다."""
+
+    return PostService(
+        db,
+        redis,
+        storage,
+    ).create(
+        current_user,
+        payload,
+    )
 
 
-# 게시글 수정
-@router.patch("/{post_id}", response_model=PostDetailResponse, summary="게시글 수정")
+@router.patch(
+    "/{post_id}",
+    response_model=PostDetailResponse,
+    summary="게시글 수정",
+)
 def update_post(
     post_id: int,
     payload: PostUpdate,
     current_user: CurrentUser,
     db: DbSession,
+    redis: RedisClient,
+    storage: StorageClient,
 ) -> PostDetailResponse:
-    post = PostService(db).update(post_id, current_user, payload)
-    return PostDetailResponse.model_validate(post)
+    """작성자가 게시글을 수정한다."""
+
+    return PostService(
+        db,
+        redis,
+        storage,
+    ).update(
+        post_id,
+        current_user,
+        payload,
+    )
 
 
-# 게시글 삭제
-# 사용 지양 -> 8.21) patch 요청으로 변경
 @router.patch(
-    "/{post_id}",
+    "/{post_id}/delete",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="게시글 삭제 (논리적 삭제 상태)",
 )
-def delete_post(post_id: int, current_user: CurrentUser, db: DbSession) -> None:
-    PostService(db).delete(post_id, current_user)
+def delete_post(
+    post_id: int,
+    current_user: CurrentUser,
+    db: DbSession,
+    redis: RedisClient,
+    storage: StorageClient,
+) -> None:
+    """게시글을 논리적으로 삭제한다."""
+
+    PostService(
+        db,
+        redis,
+        storage,
+    ).delete(
+        post_id,
+        current_user,
+    )
 
 
-# ------------------------------------------------------------------ 부가기능
+# ------------------------------------------------------------------ 좋아요
 
 
-# 좋아요 누르기
 @router.post(
     "/{post_id}/likes",
     status_code=status.HTTP_201_CREATED,
@@ -96,12 +180,22 @@ def like_post(
     post_id: int,
     current_user: CurrentUser,
     db: DbSession,
+    redis: RedisClient,
+    storage: StorageClient,
 ) -> None:
-    PostService(db).like_post(post_id, current_user)
+    """게시글에 좋아요를 등록한다."""
+
+    PostService(
+        db,
+        redis,
+        storage,
+    ).like_post(
+        post_id,
+        current_user,
+    )
 
 
-# 좋아요 취소
-@router.delete(
+@router.put(
     "/{post_id}/likes",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="게시글 좋아요 취소",
@@ -110,11 +204,24 @@ def unlike_post(
     post_id: int,
     current_user: CurrentUser,
     db: DbSession,
+    redis: RedisClient,
+    storage: StorageClient,
 ) -> None:
-    PostService(db).unlike_post(post_id, current_user)
+    """게시글 좋아요를 취소한다."""
+
+    PostService(
+        db,
+        redis,
+        storage,
+    ).unlike_post(
+        post_id,
+        current_user,
+    )
 
 
-# 공유 기능
+# ------------------------------------------------------------------ 공유
+
+
 @router.get(
     "/{post_id}/share",
     response_model=PostShareResponse,
@@ -123,11 +230,21 @@ def unlike_post(
 def share_post(
     post_id: int,
     db: DbSession,
+    redis: RedisClient,
+    storage: StorageClient,
 ) -> PostShareResponse:
-    return PostService(db).get_share_url(post_id)
+    """게시글 공유 URL을 조회한다."""
+
+    return PostService(
+        db,
+        redis,
+        storage,
+    ).get_share_url(post_id)
 
 
-# 이미지 업로드 기능
+# ------------------------------------------------------------------ 이미지
+
+
 @router.post(
     "/{post_id}/images",
     response_model=PostImageResponse,
@@ -139,8 +256,16 @@ def upload_post_image(
     image: UploadFile,
     current_user: CurrentUser,
     db: DbSession,
+    redis: RedisClient,
+    storage: StorageClient,
 ) -> PostImageResponse:
-    return PostService(db).upload_image(
+    """게시글 이미지를 업로드한다."""
+
+    return PostService(
+        db,
+        redis,
+        storage,
+    ).upload_image(
         post_id,
         current_user,
         image,

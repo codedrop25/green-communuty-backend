@@ -32,8 +32,8 @@ class PostRepository:
     # * _active : 클래스 내부의 private 와 비슷한 성격
     @staticmethod
     def _active() -> Select[tuple[Post]]:
-        """삭제되지 않은 게시글만 대상으로 하는 기본 쿼리."""
-        return select(Post).where(Post.deleted_at.is_(None))
+        """공개 상태인 게시글만 대상으로 하는 기본 쿼리."""
+        return select(Post).where(Post.post_status == "PUBLISHED")
 
     # post_id 로 post 를 조회하는 기능
     def get_by_id(self, post_id: int) -> Post | None:
@@ -46,6 +46,12 @@ class PostRepository:
         # * one_or_none() : 1개면 반환, 0개면 None / 2개 이상이면 PK 예외 발생
         return self._db.scalars(statement).one_or_none()
         # todo 개발자가 통제할 수 없는 오류가 나는 상황은 지양, 그전에 유효성 검사등을 하는걸 추천
+
+    # 관리자용 : 삭제, 숨김 처리된 게시글까지 전부 조회
+    def get_any_by_id(self, post_id: int) -> Post | None:
+        """상태와 관계없이 post_id에 해당하는 게시글을 조회한다."""
+        statement = select(Post).where(Post.post_id == post_id)
+        return self._db.scalars(statement).one_or_none()
 
     # post 상세 조회
     # 8.02) 코멘트까지 불러오는 코드 추가 필요
@@ -75,17 +81,27 @@ class PostRepository:
         return row[0], row[1]
 
     # 특정 페이지의 목록을 조회
-    # 8.21) 반환타입 추가
-    def list_paginated(self, params: PageParams) -> tuple[list[tuple[Post, User]], int]:
+    # 8.21) 추가: 반환타입 추가
+    # 9.01) 추가: 필터에 걸리는 게시글은 제외
+    def list_paginated(
+        self,
+        params: PageParams,
+        filter_words: set[str],
+    ) -> tuple[list[tuple[Post, User]], int]:
         """목록 조회 — 작성자만 함께 로드한다.
         목록에 댓글 본문은 필요 없으므로 로드하지 않는다.
         필요 없는 데이터를 미리 가져오는 것도 N+1 만큼이나 흔한 성능 문제다.
         """
+        filters = [Post.deleted_at.is_(None)]
+        for word in filter_words:
+            filters.append(Post.post_title.not_like(f"%{word}%"))
+            filters.append(Post.post_content.not_like(f"%{word}%"))
+
         total = (
             self._db.scalar(  # scalar : 단일 값 하나만 가져온다.
                 select(func.count())  # func : SQL 함수를 호출하는 메서드 -> COUNT(*)
                 .select_from(Post)  # FROM posts
-                .where(Post.deleted_at.is_(None))  # WHERE deleted_at IS NULL
+                .where(Post.deleted_at.is_(None))
             )
             or 0
         )
@@ -124,9 +140,37 @@ class PostRepository:
         self._db.refresh(post)
         return post
 
+    def hide_if_published(
+        self,
+        post_id: int,
+    ) -> None:
+        """공개 상태인 게시글을 숨김 상태로 변경한다."""
+        post = self.get_any_by_id(post_id)
+        if post is None:
+            raise ValueError("게시글을 찾을 수 없습니다.")
+
+        # 이미 삭제되거나 숨겨졌다면 상태를 변경하지 않는다.
+        if post.post_status != "PUBLISHED":
+            return
+        post.post_status = "HIDDEN"
+        self._db.flush()
+
     # service 에서 DB에 바로 접근하지 않도록 한 번 감싼 캡슐화 메서드
     def flush(self) -> None:
         self._db.flush()
+
+    # ------------------------------------------------------------------ 필터링
+
+    # # 필터링 등록
+    # def add_filter_word(self, user_id: int, filter_word: str) -> None:
+    #     key = f"filter_words:{user_id}"
+    #     self._redis.sadd(key,filter_word)
+
+    # # 필터링 목록 가져오기
+    # def get_filter_words(self, user_id:int) -> set[str]:
+    #     key = f"filter_words:{user_id}"
+    #     return cast(set[str], self._redis.smembers(key))
+    #     # .get() 과 마찬가지로 타입 에러 때문에 cast 로 감싸서 타입을 지정하도록 수정
 
     # ------------------------------------------------------------------ 좋아요
 
@@ -202,17 +246,22 @@ class PostRepository:
     # ------------------------------------------------------------------ 이미지
 
     # 이미지 저장
+    # 9.03) 이미지 3종의 객체 키를 DB에 저장
     def add_image(
         self,
         post_id: int,
-        image_path: str,
+        image_original_path: str,
+        image_content_path: str,
+        image_thumbnail_path: str,
     ) -> PostImage:
-        post_image = PostImage(
+        post_image = PostImage(  # DB 에 저장할 객체를 생성
             post_id=post_id,
-            image_path=image_path,
+            image_original_path=image_original_path,
+            image_content_path=image_content_path,
+            image_thumbnail_path=image_thumbnail_path,
         )
-        self._db.add(post_image)
-        self._db.flush()
-        self._db.refresh(post_image)
+        self._db.add(post_image)  # INSERT 대상으로 세션에 등록
+        self._db.flush()  # INSERT 를 DB 에 전달해 image_id 생성
+        self._db.refresh(post_image)  # DB 에 저장된 최신 값으로 객체를 갱신
 
-        return post_image
+        return post_image  # 저장된 이미지 객체를 반환

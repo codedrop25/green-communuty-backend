@@ -74,7 +74,7 @@ class PostSummaryResponse(BaseModel):
         )
 
 
-# ResponseDTO
+# Response DTO
 class PostDetailResponse(BaseModel):
     """상세용 응답. 댓글 목록을 포함한다."""
 
@@ -119,8 +119,12 @@ class PostDetailResponse(BaseModel):
         )
 
 
-# 공유 기능
-# Response DTO
+# # 필터링 Request DTO
+# class FilterWordCreate(BaseModel):
+#     filter_word: str
+
+
+# 공유 Response DTO
 class PostShareResponse(BaseModel):
     share_url: str
 
