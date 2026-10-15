@@ -89,21 +89,29 @@ class PostService:
             is_liked,
         )
 
+    # 10.15 변경: 최신순 정렬, 공지 추가
     def list_posts(
         self,
         params: PageParams,
         current_user: CurrentUser,
-    ) -> tuple[list[tuple[Post, User]], int]:
-        """게시글 목록을 조회한다."""
+    ) -> tuple[list[tuple[Post, User]], list[tuple[Post, User]], int]:
+        """공지와 게시글 목록을 각각 조회한다."""
 
-        # 아직 PostRepository에 get_filter_words()가 없으므로
-        # 필터링하지 않는 빈 집합을 임시로 전달한다.
+        # 아직 PostRepository에 get_filter_words()가 없으므로 필터링하지 않는 빈 집합을 임시로 전달.
         filter_words: set[str] = set()
 
-        return self._post_repository.list_paginated(
+        # 공지 목록과 페이지 목록을 불러온다
+        notices = self._post_repository.list_notices()
+        posts, total = self._post_repository.list_paginated(
             params,
             filter_words,
         )
+
+        # 최신순으로 정렬
+        notices.sort(key=lambda item: item[0].post_id, reverse=True)
+        posts.sort(key=lambda item: item[0].post_id, reverse=True)
+
+        return notices, posts, total
 
     # ---------------------------------------------------------- 생성/수정/삭제
 

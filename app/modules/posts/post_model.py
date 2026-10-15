@@ -2,7 +2,7 @@
 
 # from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum, String, Text
+from sqlalchemy import Enum, String, Text, false
 from sqlalchemy.orm import Mapped, mapped_column
 
 # * SQLAlchemy 에게 이 파일은 ORM 모델이라고 알려주는 코드, SpringBoot 의 @Entity 와 비슷한 역할
@@ -38,6 +38,13 @@ class Post(Base, TimestampMixin, SoftDeleteMixin):
         default="PUBLISHED",
         server_default="PUBLISHED",
         index=True,
+    )
+
+    # 공지 유무
+    # server_default=False() : DB 기본값, 새 커럶 추가시 기존 데이터의 값도 채워지도록 적용함.
+    # false() : SQLAlchemy가 SQL의 거짓 값을 표현하도록 제공하는 함수.
+    post_is_notice: Mapped[bool] = mapped_column(
+        nullable=False, default=False, server_default=false()
     )
 
     # * representation, 객체를 개발자가 확인하기 좋은 문자열 형태로 표현하는 특수 메서드

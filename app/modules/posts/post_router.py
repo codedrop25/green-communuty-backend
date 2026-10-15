@@ -16,6 +16,7 @@ from app.modules.posts.post_schemas import (
     PostCreate,
     PostDetailResponse,
     PostImageResponse,
+    PostListResponse,
     PostShareResponse,
     PostSummaryResponse,
     PostUpdate,
@@ -36,9 +37,10 @@ router = APIRouter(
 # ------------------------------------------------------------------ 조회
 
 
+# 10.15 변경: 공지 추가
 @router.get(
     "",
-    response_model=PageResponse[PostSummaryResponse],
+    response_model=PostListResponse,
     summary="게시글 목록",
 )
 def list_posts(
@@ -47,10 +49,11 @@ def list_posts(
     db: DbSession,
     redis: RedisClient,
     storage: StorageClient,
-) -> PageResponse[PostSummaryResponse]:
+) -> PostListResponse:
     """게시글 목록을 조회한다."""
 
-    posts, total = PostService(
+    # 공지, 게시글목록, 총 게시글 수를 조회
+    notices, posts, total = PostService(
         db,
         redis,
         storage,
@@ -59,10 +62,27 @@ def list_posts(
         current_user,
     )
 
-    return PageResponse.create(
+    page = PageResponse.create(
         items=[PostSummaryResponse.from_entities(post, author) for post, author in posts],
         total=total,
         params=params,
+    )
+
+    # 기존 일반 게시글 + 페이지 정보
+    # page.model_dump() : 기존 페이지 응답을 딕셔너리로 바꿈
+    page_data = page.model_dump()
+
+    # 공지 목록을 응답용 객체로 변환
+    notice_items = []
+    for post, author in notices:
+        notice = PostSummaryResponse.from_entities(post, author)
+        notice_items.append(notice)
+
+    # 둘을 하나의 응답으로 합침
+    # ** : 그 필드들을 PostListResponse에 풀어 넣는 문법.
+    return PostListResponse(
+        **page_data,
+        notices=notice_items,
     )
 
 

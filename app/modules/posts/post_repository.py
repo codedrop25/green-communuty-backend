@@ -101,7 +101,7 @@ class PostRepository:
             self._db.scalar(  # scalar : 단일 값 하나만 가져온다.
                 select(func.count())  # func : SQL 함수를 호출하는 메서드 -> COUNT(*)
                 .select_from(Post)  # FROM posts
-                .where(Post.deleted_at.is_(None))
+                .where(Post.deleted_at.is_(None) and Post.post_is_notice.is_(False))
             )
             or 0
         )
@@ -109,6 +109,7 @@ class PostRepository:
             self._active()
             .join(User, Post.author_id == User.user_id)
             .add_columns(User)
+            .where(Post.post_is_notice.is_(False))
             # .order_by(Post.post_id.desc())
             # * .order_by, desc 등은 지양하는게 좋음,가져와서 로직으로 푸는게 더 데이터 적으로 낫다.
             .offset(params.offset)
@@ -118,6 +119,18 @@ class PostRepository:
         result = [(row[0], row[1]) for row in rows]
 
         return result, total
+
+    # 10.15 추가: 공지 조회 기능
+    def list_notices(self) -> list[tuple[Post, User]]:
+        statement = (
+            self._active()
+            .add_columns(User)
+            .join(User, Post.author_id == User.user_id)
+            .where(Post.post_is_notice.is_(True))
+        )
+        rows = self._db.execute(statement).all()
+
+        return [(post, author) for post, author in rows]
 
     # 삭제되지 않은 댓글 갯수를 count
     def count_comments(self, post_id: int) -> int:

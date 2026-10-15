@@ -5,6 +5,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.common.pagination import PageResponse
 from app.modules.posts.post_model import Post
 from app.modules.users.user_model import User
 
@@ -72,6 +73,13 @@ class PostSummaryResponse(BaseModel):
             ),
             created_at=post.created_at,
         )
+
+
+# 공지용 Response DTO
+class PostListResponse(PageResponse[PostSummaryResponse]):
+    """공지 조회용"""
+
+    notices: list[PostSummaryResponse]
 
 
 # Response DTO
