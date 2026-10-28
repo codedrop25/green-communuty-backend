@@ -107,10 +107,10 @@ def test_replies_do_not_inflate_parent_pagination(
         json={"comment_content": "답글", "parent_comment_id": parent},
     )
     assert response.status_code == 201
-    page = client.get(f"{API}/posts/{post_id}/comments?size=1").json()
+    page = client.get(f"{API}/posts/{post_id}/comments?size=1", headers=headers).json()
     assert page["total"] == 1 and page["total_pages"] == 1
     assert page["items"][0]["reply_count"] == 1
-    replies = client.get(f"{API}/comments/{parent}/replies").json()
+    replies = client.get(f"{API}/comments/{parent}/replies", headers=headers).json()
     assert replies[0]["comment_content"] == "답글"
 
 

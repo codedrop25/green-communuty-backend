@@ -3,16 +3,25 @@
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, StringConstraints
 
 from app.core.security import BCRYPT_MAX_PASSWORD_BYTES
 from app.modules.users.user_model import UserRole
 
-# bcrypt 는 72바이트를 넘는 입력을 잘라내므로, 그 길이를 상한으로 못 박는다.
-# 상한이 없으면 "앞 72바이트만 같아도 로그인되는" 상태가 조용히 만들어진다.
-# ASCII 기준 최대 길이로 환산해 사용한다.
-PasswordStr = Annotated[str, Field(min_length=8, max_length=BCRYPT_MAX_PASSWORD_BYTES)]
-NicknameStr = Annotated[str, Field(min_length=2, max_length=50)]
+
+def validate_password_bytes(value: str) -> str:
+    # bcrypt 5는 글자 수가 아닌 UTF-8 바이트 수가 72를 넘으면 예외를 발생시킨다.
+    if len(value.encode("utf-8")) > BCRYPT_MAX_PASSWORD_BYTES:
+        raise ValueError("비밀번호는 UTF-8 기준 72바이트 이내로 입력해주세요.")
+    return value
+
+
+PasswordStr = Annotated[
+    str,
+    Field(min_length=8, max_length=BCRYPT_MAX_PASSWORD_BYTES),
+    AfterValidator(validate_password_bytes),
+]
+NicknameStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=50)]
 
 
 class UserCreate(BaseModel):

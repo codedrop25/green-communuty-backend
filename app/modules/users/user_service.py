@@ -6,6 +6,7 @@
     전역 예외 핸들러가 정상적으로 오류 응답을 만들 수 있다.
 """
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.common.pagination import PageParams
@@ -39,7 +40,7 @@ class UserService:
 
         이메일 중복은 사전 조회로 걸러 사용자에게 친절한 409 를 준다.
         동시 요청으로 사전 조회를 통과하더라도 DB 의 UNIQUE 제약이 최종 방어선이 되며,
-        그 경우 IntegrityError 가 전역 핸들러에서 처리된다.
+        그 경우에도 트랜잭션을 롤백하고 동일한 409 응답을 반환한다.
         """
         if self._repository.exists_by_email(payload.user_email):
             raise ConflictError("이미 사용 중인 이메일입니다.")
@@ -49,8 +50,14 @@ class UserService:
             user_password_hash=hash_password(payload.user_password),
             user_nickname=payload.user_nickname,
         )
-        self._repository.add(user)
-        self._db.commit()
+        try:
+            self._repository.add(user)
+            self._db.commit()
+        except IntegrityError as exc:
+            self._db.rollback()
+            if self._repository.exists_by_email(payload.user_email):
+                raise ConflictError("이미 사용 중인 이메일입니다.") from exc
+            raise
         return user
 
     def update(self, user: User, payload: UserUpdate) -> User:

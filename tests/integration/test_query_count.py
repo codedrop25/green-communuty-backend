@@ -54,11 +54,15 @@ def post_with_comments(client: TestClient, signup: Callable[..., dict[str, str]]
 
 
 def test_comment_list_query_count_is_constant(
-    client: TestClient, engine: Engine, post_with_comments: int
+    client: TestClient,
+    engine: Engine,
+    post_with_comments: int,
+    signup: Callable[..., dict[str, str]],
 ) -> None:
     """댓글 페이지는 댓글 수와 무관하게 고정된 SELECT만 쓴다."""
+    headers = signup("comment-reader@example.com", "독자")
     with count_queries(engine) as statements:
-        response = client.get(f"{API}/posts/{post_with_comments}/comments")
+        response = client.get(f"{API}/posts/{post_with_comments}/comments", headers=headers)
 
     assert response.status_code == 200
     assert len(response.json()["items"]) == 5

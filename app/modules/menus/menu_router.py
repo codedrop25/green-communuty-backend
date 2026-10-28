@@ -30,7 +30,7 @@ router = APIRouter(prefix="/menus", tags=["menus"])
 
 
 # GET /api/v1/menus
-# 로그인 없이 접근 가능하다. 게시판 목록은 비회원도 봐야 하기 때문.
+# v1 라우터의 공통 인증 의존성으로 로그인한 사용자만 조회할 수 있다.
 @router.get("", response_model=list[MenuTreeResponse], summary="메뉴 트리 조회")
 def get_menu_tree(db: DbSession) -> list[MenuTreeResponse]:
     # Service 가 이미 트리 형태로 조립해서 돌려주므로 그대로 반환한다.

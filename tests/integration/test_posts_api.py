@@ -52,7 +52,9 @@ class TestPostCrud:
         body = response.json()
         # 관계가 lazy="raise" 이므로, eager loading 이 빠지면 여기서 예외가 난다.
         assert body["author"]["user_nickname"] == "작성자"
-        comments = client.get(f"{API}/posts/{post_id}/comments").json()["items"]
+        comments = client.get(f"{API}/posts/{post_id}/comments", headers=author_headers).json()[
+            "items"
+        ]
         assert [c["comment_content"] for c in comments] == ["댓글 본문"]
 
     def test_list_returns_page_response(
@@ -197,7 +199,9 @@ class TestComments:
                 json={"comment_content": f"댓글 {i}"},
             )
 
-        response = client.get(f"{API}/posts/{post_id}/comments", params={"page": 1, "size": 2})
+        response = client.get(
+            f"{API}/posts/{post_id}/comments", headers=author_headers, params={"page": 1, "size": 2}
+        )
 
         assert response.status_code == 200
         body = response.json()

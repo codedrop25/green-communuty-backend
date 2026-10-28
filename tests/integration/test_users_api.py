@@ -52,7 +52,7 @@ class TestMe:
         headers = signup("bye@example.com")
         assert client.delete(f"{API}/users/me", headers=headers).status_code == 204
 
-        assert client.get(f"{API}/users/me", headers=headers).status_code == 403
+        assert client.get(f"{API}/users/me", headers=headers).status_code == 401
 
     def test_deactivated_user_cannot_login(
         self, client: TestClient, signup: Callable[..., dict[str, str]]

@@ -52,7 +52,7 @@ def get_current_user(
         # 토큰은 유효하지만 유저가 삭제된 경우.
         raise UnauthorizedError("인증이 필요합니다.")
     if not user.user_is_active:
-        raise ForbiddenError("비활성화된 계정입니다.")
+        raise UnauthorizedError("비활성화된 계정입니다. 다시 로그인해주세요.")
 
     return user
 

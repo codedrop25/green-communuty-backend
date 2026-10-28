@@ -9,7 +9,9 @@ from collections.abc import Callable
 import pytest
 from fastapi.testclient import TestClient
 from httpx import Response
+from pytest_mock import MockerFixture
 
+from app.modules.users.user_repository import UserRepository
 from tests.integration.conftest import API, DEFAULT_PASSWORD
 
 pytestmark = pytest.mark.integration
@@ -36,6 +38,79 @@ def _post_with_refresh(client: TestClient, path: str, token: str) -> Response:
 
 
 class TestSignupLogin:
+    @pytest.mark.parametrize("password", ["가" * 25, "😀" * 19])
+    def test_multibyte_password_over_72_bytes_returns_422(
+        self, client: TestClient, password: str
+    ) -> None:
+        response = client.post(
+            f"{API}/auth/signup",
+            json={
+                "user_email": "bytes@example.com",
+                "user_password": password,
+                "user_nickname": "바이트",
+            },
+        )
+        assert response.status_code == 422
+        assert response.json()["detail"][0]["field"] == "user_password"
+        response = client.post(
+            f"{API}/auth/login", json={"email": "bytes@example.com", "password": password}
+        )
+        assert response.status_code == 422
+
+    def test_multibyte_password_at_72_bytes_can_signup_and_login(self, client: TestClient) -> None:
+        password = "가" * 24
+        response = client.post(
+            f"{API}/auth/signup",
+            json={
+                "user_email": "  boundary@example.com  ",
+                "user_password": password,
+                "user_nickname": "  초록  ",
+            },
+        )
+        assert response.status_code == 201
+        assert response.json()["user_nickname"] == "초록"
+        response = client.post(
+            f"{API}/auth/login", json={"email": "boundary@example.com", "password": password}
+        )
+        assert response.status_code == 200
+        assert (
+            client.get(
+                f"{API}/users/me",
+                headers={"Authorization": f"Bearer {response.json()['access_token']}"},
+            ).status_code
+            == 200
+        )
+
+    @pytest.mark.parametrize("nickname", ["  ", " 가 "])
+    def test_blank_or_short_trimmed_nickname_returns_422(
+        self, client: TestClient, nickname: str
+    ) -> None:
+        response = client.post(
+            f"{API}/auth/signup",
+            json={
+                "user_email": "nickname@example.com",
+                "user_password": DEFAULT_PASSWORD,
+                "user_nickname": nickname,
+            },
+        )
+        assert response.status_code == 422
+
+    def test_duplicate_email_race_returns_409(
+        self, client: TestClient, signup: Callable[..., dict[str, str]], mocker: MockerFixture
+    ) -> None:
+        signup("race@example.com")
+        # Simulate another signup committing after the preflight check. The INSERT is real.
+        mocker.patch.object(UserRepository, "exists_by_email", side_effect=[False, True])
+        response = client.post(
+            f"{API}/auth/signup",
+            json={
+                "user_email": "race@example.com",
+                "user_password": DEFAULT_PASSWORD,
+                "user_nickname": "동시가입",
+            },
+        )
+        assert response.status_code == 409
+
     def test_signup_returns_user_without_password(self, client: TestClient) -> None:
         response = client.post(
             f"{API}/auth/signup",
