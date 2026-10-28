@@ -19,7 +19,11 @@ def signup(client: TestClient) -> Callable[..., dict[str, str]]:
     def _signup(email: str, nickname: str = "tester") -> dict[str, str]:
         response = client.post(
             f"{API}/auth/signup",
-            json={"email": email, "password": DEFAULT_PASSWORD, "nickname": nickname},
+            json={
+                "user_email": email,
+                "user_password": DEFAULT_PASSWORD,
+                "user_nickname": nickname,
+            },
         )
         assert response.status_code == 201, response.text
 

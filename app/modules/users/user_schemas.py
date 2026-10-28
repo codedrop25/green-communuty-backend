@@ -43,4 +43,4 @@ class UserResponse(BaseModel):
     user_nickname: str
     user_role: UserRole
     user_is_active: bool
-    user_created_at: datetime
+    user_created_at: datetime = Field(validation_alias="created_at")

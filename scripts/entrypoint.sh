@@ -11,11 +11,21 @@
 set -eu
 
 ENVIRONMENT="${ENVIRONMENT:-local}"
+DB_SYNCHRONIZE="${DB_SYNCHRONIZE:-false}"
 
 case "$ENVIRONMENT" in
     local | dev)
-        echo "[entrypoint] ENVIRONMENT=${ENVIRONMENT} — 마이그레이션을 적용합니다."
-        alembic upgrade head
+        # 자동 동기화를 켠 경우 스키마는 앱 기동 시 모델 기준으로 맞춰진다.
+        # 여기서 마이그레이션까지 돌리면 이미 동기화된 컬럼을 다시 추가하려다 기동이 실패할 수 있다.
+        case "$DB_SYNCHRONIZE" in
+            true | True | TRUE | 1)
+                echo "[entrypoint] DB_SYNCHRONIZE=${DB_SYNCHRONIZE} — 마이그레이션 대신 앱 기동 시 자동 동기화합니다."
+                ;;
+            *)
+                echo "[entrypoint] ENVIRONMENT=${ENVIRONMENT} — 마이그레이션을 적용합니다."
+                alembic upgrade head
+                ;;
+        esac
         ;;
     *)
         echo "[entrypoint] ENVIRONMENT=${ENVIRONMENT} — 마이그레이션을 건너뜁니다."

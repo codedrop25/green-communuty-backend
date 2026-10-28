@@ -16,7 +16,12 @@ from sqlalchemy.orm import Session
 
 from app.common.dependencies import CurrentUser
 from app.common.pagination import PageParams
-from app.core.exceptions import ForbiddenError, NotFoundError
+from app.core.exceptions import (
+    BadRequestError,
+    ForbiddenError,
+    NotFoundError,
+    StorageNotConfiguredError,
+)
 from app.infrastructure.storage.base import Storage
 from app.modules.posts.post_model import Post
 from app.modules.posts.post_repository import PostRepository
@@ -40,7 +45,7 @@ class PostService:
         self,
         db: Session,
         redis: Redis,
-        storage: Storage,
+        storage: Storage | None = None,
     ) -> None:
         """게시글 기능에 필요한 DB, Redis, Storage를 준비한다."""
 
@@ -71,8 +76,8 @@ class PostService:
         is_author = post.author_id == current_user.user_id
 
         if not is_author:
-            post.post_view_count += 1
-            self._post_repository.flush()
+            self._post_repository.increment_views(post)
+            self._db.commit()
 
         # 게시글의 좋아요 정보도 함께 조회한다.
         post_like_count = self._post_repository.count_likes(post_id)
@@ -81,13 +86,15 @@ class PostService:
             current_user.user_id,
         )
 
-        return PostDetailResponse.from_entities(
+        response = PostDetailResponse.from_entities(
             post,
             author,
             post.post_view_count,
             post_like_count,
             is_liked,
         )
+        response.has_images = bool(self._post_repository.list_images(post_id))
+        return response
 
     # 10.15 변경: 최신순 정렬, 공지 추가
     def list_posts(
@@ -167,6 +174,7 @@ class PostService:
 
         # 실제 행을 삭제하지 않고 삭제 시각을 기록한다.
         post.deleted_at = datetime.now(UTC).replace(tzinfo=None)
+        post.post_status = "DELETED"
 
         self._post_repository.flush()
         self._db.commit()
@@ -262,6 +270,23 @@ class PostService:
 
     # ------------------------------------------------------------------ 이미지
 
+    def list_images(self, post_id: int) -> list[PostImageResponse]:
+        if self._post_repository.get_by_id(post_id) is None:
+            raise NotFoundError("게시글을 찾을 수 없습니다.")
+        images = self._post_repository.list_images(post_id)
+        if not images:
+            return []
+        if self._storage is None:
+            raise StorageNotConfiguredError
+        return [
+            PostImageResponse(
+                image_id=image.image_id,
+                post_id=image.post_id,
+                image_url=self._storage.generate_presigned_url(image.image_content_path, 3600),
+            )
+            for image in images
+        ]
+
     def upload_image(
         self,
         post_id: int,
@@ -278,23 +303,24 @@ class PostService:
         if post.author_id != current_user.user_id:
             raise ForbiddenError("본인이 작성한 게시글에만 이미지를 추가할 수 있습니다.")
 
-        # TODO: 파일 형식, 확장자, 용량 제한 검사
-        # self._validate_image(image)
+        if self._storage is None:
+            raise StorageNotConfiguredError
 
         # 원본 파일의 확장자를 가져온다.
         suffix = Path(image.filename or "").suffix.lower()
 
         # 업로드된 파일 전체를 bytes로 읽는다.
-        original_data = image.file.read()
+        max_image_bytes = 10 * 1024 * 1024
+        original_data = image.file.read(max_image_bytes + 1)
+        if len(original_data) > max_image_bytes:
+            raise BadRequestError("이미지는 10MB 이하로 업로드해주세요.")
 
         # 원본을 본문용 이미지와 썸네일 이미지로 변환한다.
-        content_data = self._resize_image(
-            original_data,
-            max_width=MAX_CONTENT_WIDTH_PX,
-        )
-        thumbnail_data = self._create_thumbnail_image(
-            original_data,
-        )
+        try:
+            content_data = self._resize_image(original_data, max_width=MAX_CONTENT_WIDTH_PX)
+            thumbnail_data = self._create_thumbnail_image(original_data)
+        except (OSError, ValueError, Image.DecompressionBombError) as exc:
+            raise BadRequestError("지원하지 않거나 크기가 너무 큰 이미지입니다.") from exc
 
         # 파일 이름이 중복되지 않도록 UUID를 생성한다.
         file_id = uuid4()

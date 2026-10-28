@@ -61,6 +61,7 @@ class PostSummaryResponse(BaseModel):
     post_title: str
     author: AuthorSummary
     created_at: datetime
+    post_view_count: int = 0
 
     @classmethod
     def from_entities(cls, post: Post, author: User) -> "PostSummaryResponse":
@@ -72,6 +73,7 @@ class PostSummaryResponse(BaseModel):
                 user_nickname=author.user_nickname,
             ),
             created_at=post.created_at,
+            post_view_count=post.post_view_count,
         )
 
 
@@ -94,6 +96,7 @@ class PostDetailResponse(BaseModel):
     post_view_count: int  # 조회수
     post_like_count: int  # 좋아요
     is_liked: bool  # 좋아요
+    has_images: bool = False
     author: AuthorSummary
     comments: list[CommentResponse]
     created_at: datetime

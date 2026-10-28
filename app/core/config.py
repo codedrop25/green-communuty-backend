@@ -26,6 +26,9 @@ _INSECURE_SECRET_KEY = "change-me-in-production-this-is-not-a-secret"
 # 이보다 짧으면 서명 강도가 알고리즘이 보장하는 수준에 못 미친다.
 MIN_SECRET_KEY_BYTES = 32
 
+# DB 자동 동기화(DB_SYNCHRONIZE)를 켤 수 있는 환경. DROP 까지 수행하므로 개발 환경으로 한정한다.
+DB_SYNCHRONIZE_ALLOWED_ENVIRONMENTS: frozenset[str] = frozenset({"local", "dev"})
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -72,6 +75,10 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = Field(default=30, ge=0)
     DB_POOL_TIMEOUT: int = Field(default=30, ge=1)
     DB_ECHO: bool = False
+
+    # 기동 시 모델 → DB 스키마 자동 동기화 (TypeORM 의 synchronize: true).
+    # 테이블/컬럼 DROP 까지 반영한다. 상세는 infrastructure/database/synchronize.py 참고.
+    DB_SYNCHRONIZE: bool = False
 
     # PLAN.md 3-3: `def` 라우터가 실행되는 AnyIO threadpool 크기.
     # 이 값이 커넥션 풀 총량보다 크면 QueuePool 타임아웃이 발생한다 (아래 검증 로직 참고).
@@ -209,6 +216,21 @@ class Settings(BaseSettings):
                 f"DB 커넥션 총량({capacity} = DB_POOL_SIZE {self.DB_POOL_SIZE} "
                 f"+ DB_MAX_OVERFLOW {self.DB_MAX_OVERFLOW}) 보다 큽니다. "
                 "부하 시 QueuePool 타임아웃이 발생하므로 두 값을 맞춰주세요."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_db_synchronize(self) -> "Settings":
+        """자동 동기화는 데이터 손실(DROP)을 일으킬 수 있으므로 개발 환경에서만 허용한다.
+
+        운영에서 실수로 켜진 채 배포되면 모델에서 빠진 컬럼의 데이터가 그대로 사라진다.
+        런타임 사고가 아니라 기동 실패로 바꾼다.
+        """
+        if self.DB_SYNCHRONIZE and self.ENVIRONMENT not in DB_SYNCHRONIZE_ALLOWED_ENVIRONMENTS:
+            raise ValueError(
+                f"DB_SYNCHRONIZE 는 {sorted(DB_SYNCHRONIZE_ALLOWED_ENVIRONMENTS)} 환경에서만 "
+                f"켤 수 있습니다 (현재 ENVIRONMENT={self.ENVIRONMENT}). "
+                "운영 스키마 변경은 Alembic 마이그레이션으로 반영하세요."
             )
         return self
 

@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install dev up down logs migrate migration downgrade seed \
+.PHONY: help install dev up down logs migrate migration downgrade seed sync-preview \
         lint format typecheck test test-unit test-integration check clean
 
 help: ## 사용 가능한 명령 목록
@@ -39,6 +39,9 @@ migration: ## 마이그레이션 생성  예) make migration m="add user phone"
 
 downgrade: ## 마이그레이션 1단계 되돌리기
 	poetry run alembic downgrade -1
+
+sync-preview: ## DB_SYNCHRONIZE 로 실행될 스키마 변경 미리보기 (DB 는 바꾸지 않음)
+	poetry run python -m app.infrastructure.database.synchronize
 
 check-migration: ## 모델과 마이그레이션이 일치하는지 검사 (CI 용)
 	poetry run alembic check

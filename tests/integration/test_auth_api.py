@@ -39,18 +39,26 @@ class TestSignupLogin:
     def test_signup_returns_user_without_password(self, client: TestClient) -> None:
         response = client.post(
             f"{API}/auth/signup",
-            json={"email": "new@example.com", "password": DEFAULT_PASSWORD, "nickname": "신규"},
+            json={
+                "user_email": "new@example.com",
+                "user_password": DEFAULT_PASSWORD,
+                "user_nickname": "신규",
+            },
         )
 
         assert response.status_code == 201
         body = response.json()
-        assert body["email"] == "new@example.com"
+        assert body["user_email"] == "new@example.com"
         # 해시가 응답에 새어 나가면 안 된다.
         assert "password" not in body
-        assert "password_hash" not in body
+        assert "user_password_hash" not in body
 
     def test_duplicate_email_returns_409(self, client: TestClient) -> None:
-        payload = {"email": "dup@example.com", "password": DEFAULT_PASSWORD, "nickname": "중복"}
+        payload = {
+            "user_email": "dup@example.com",
+            "user_password": DEFAULT_PASSWORD,
+            "user_nickname": "중복",
+        }
         client.post(f"{API}/auth/signup", json=payload)
 
         response = client.post(f"{API}/auth/signup", json=payload)

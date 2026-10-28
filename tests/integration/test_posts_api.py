@@ -25,15 +25,15 @@ def post_id(client: TestClient, author_headers: dict[str, str]) -> int:
     response = client.post(
         f"{API}/posts",
         headers=author_headers,
-        json={"title": "테스트 게시글", "content": "본문"},
+        json={"post_title": "테스트 게시글", "post_content": "본문"},
     )
     assert response.status_code == 201, response.text
-    return int(response.json()["id"])
+    return int(response.json()["post_id"])
 
 
 class TestPostCrud:
     def test_create_requires_authentication(self, client: TestClient) -> None:
-        response = client.post(f"{API}/posts", json={"title": "익명", "content": "본문"})
+        response = client.post(f"{API}/posts", json={"post_title": "익명", "post_content": "본문"})
 
         assert response.status_code == 401
 
@@ -43,28 +43,37 @@ class TestPostCrud:
         client.post(
             f"{API}/posts/{post_id}/comments",
             headers=author_headers,
-            json={"content": "댓글 본문"},
+            json={"comment_content": "댓글 본문"},
         )
 
-        response = client.get(f"{API}/posts/{post_id}")
+        response = client.get(f"{API}/posts/{post_id}", headers=author_headers)
 
         assert response.status_code == 200
         body = response.json()
         # 관계가 lazy="raise" 이므로, eager loading 이 빠지면 여기서 예외가 난다.
-        assert body["author"]["nickname"] == "작성자"
-        assert [c["content"] for c in body["comments"]] == ["댓글 본문"]
+        assert body["author"]["user_nickname"] == "작성자"
+        comments = client.get(f"{API}/posts/{post_id}/comments").json()["items"]
+        assert [c["comment_content"] for c in comments] == ["댓글 본문"]
 
-    def test_list_returns_page_response(self, client: TestClient, post_id: int) -> None:
-        response = client.get(f"{API}/posts", params={"page": 1, "size": 10})
+    def test_list_returns_page_response(
+        self, client: TestClient, post_id: int, author_headers: dict[str, str]
+    ) -> None:
+        response = client.get(
+            f"{API}/posts", headers=author_headers, params={"page": 1, "size": 10}
+        )
 
         assert response.status_code == 200
         body = response.json()
         assert {"items", "total", "page", "size", "total_pages"} <= body.keys()
         assert body["total"] >= 1
 
-    def test_page_size_upper_bound_is_enforced(self, client: TestClient) -> None:
+    def test_page_size_upper_bound_is_enforced(
+        self, client: TestClient, author_headers: dict[str, str]
+    ) -> None:
         """상한이 없으면 size=100000 한 번으로 DB 를 밀어버릴 수 있다."""
-        response = client.get(f"{API}/posts", params={"page": 1, "size": 10_000})
+        response = client.get(
+            f"{API}/posts", headers=author_headers, params={"page": 1, "size": 10_000}
+        )
 
         assert response.status_code == 422
 
@@ -73,12 +82,14 @@ class TestPostCrud:
         created = client.post(
             f"{API}/posts",
             headers=author_headers,
-            json={"title": "이모지 🎉🔥", "content": "본문 ✅"},
+            json={"post_title": "이모지 🎉🔥", "post_content": "본문 ✅"},
         )
 
         assert created.status_code == 201
-        detail = client.get(f"{API}/posts/{created.json()['id']}").json()
-        assert detail["title"] == "이모지 🎉🔥"
+        detail = client.get(
+            f"{API}/posts/{created.json()['post_id']}", headers=author_headers
+        ).json()
+        assert detail["post_title"] == "이모지 🎉🔥"
 
 
 class TestPostOwnership:
@@ -88,7 +99,7 @@ class TestPostOwnership:
         self, client: TestClient, other_headers: dict[str, str], post_id: int
     ) -> None:
         response = client.patch(
-            f"{API}/posts/{post_id}", headers=other_headers, json={"title": "탈취"}
+            f"{API}/posts/{post_id}", headers=other_headers, json={"post_title": "탈취"}
         )
 
         assert response.status_code == 403
@@ -97,7 +108,7 @@ class TestPostOwnership:
     def test_other_user_cannot_delete(
         self, client: TestClient, other_headers: dict[str, str], post_id: int
     ) -> None:
-        response = client.delete(f"{API}/posts/{post_id}", headers=other_headers)
+        response = client.patch(f"{API}/posts/{post_id}/delete", headers=other_headers)
 
         assert response.status_code == 403
 
@@ -105,50 +116,52 @@ class TestPostOwnership:
         self, client: TestClient, author_headers: dict[str, str], post_id: int
     ) -> None:
         response = client.patch(
-            f"{API}/posts/{post_id}", headers=author_headers, json={"title": "수정됨"}
+            f"{API}/posts/{post_id}", headers=author_headers, json={"post_title": "수정됨"}
         )
 
         assert response.status_code == 200
-        assert response.json()["title"] == "수정됨"
+        assert response.json()["post_title"] == "수정됨"
 
     def test_partial_update_keeps_unsent_fields(
         self, client: TestClient, author_headers: dict[str, str], post_id: int
     ) -> None:
         """보내지 않은 필드가 None 으로 덮어써지면 안 된다."""
         response = client.patch(
-            f"{API}/posts/{post_id}", headers=author_headers, json={"title": "제목만 변경"}
+            f"{API}/posts/{post_id}", headers=author_headers, json={"post_title": "제목만 변경"}
         )
 
         assert response.status_code == 200
-        assert response.json()["content"] == "본문"
+        assert response.json()["post_content"] == "본문"
 
 
 class TestSoftDelete:
     def test_deleted_post_is_hidden(
         self, client: TestClient, author_headers: dict[str, str], post_id: int
     ) -> None:
-        assert client.delete(f"{API}/posts/{post_id}", headers=author_headers).status_code == 204
+        assert (
+            client.patch(f"{API}/posts/{post_id}/delete", headers=author_headers).status_code == 204
+        )
 
-        assert client.get(f"{API}/posts/{post_id}").status_code == 404
+        assert client.get(f"{API}/posts/{post_id}", headers=author_headers).status_code == 404
 
     def test_deleted_post_excluded_from_list(
         self, client: TestClient, author_headers: dict[str, str], post_id: int
     ) -> None:
-        before = client.get(f"{API}/posts").json()["total"]
-        client.delete(f"{API}/posts/{post_id}", headers=author_headers)
+        before = client.get(f"{API}/posts", headers=author_headers).json()["total"]
+        client.patch(f"{API}/posts/{post_id}/delete", headers=author_headers)
 
-        after = client.get(f"{API}/posts").json()["total"]
+        after = client.get(f"{API}/posts", headers=author_headers).json()["total"]
         assert after == before - 1
 
     def test_cannot_comment_on_deleted_post(
         self, client: TestClient, author_headers: dict[str, str], post_id: int
     ) -> None:
-        client.delete(f"{API}/posts/{post_id}", headers=author_headers)
+        client.patch(f"{API}/posts/{post_id}/delete", headers=author_headers)
 
         response = client.post(
             f"{API}/posts/{post_id}/comments",
             headers=author_headers,
-            json={"content": "삭제된 글에 댓글"},
+            json={"comment_content": "삭제된 글에 댓글"},
         )
 
         assert response.status_code == 404
@@ -165,11 +178,11 @@ class TestComments:
         comment_id = client.post(
             f"{API}/posts/{post_id}/comments",
             headers=author_headers,
-            json={"content": "원본"},
-        ).json()["id"]
+            json={"comment_content": "원본"},
+        ).json()["comment_id"]
 
         response = client.patch(
-            f"{API}/comments/{comment_id}", headers=other_headers, json={"content": "탈취"}
+            f"{API}/comments/{comment_id}", headers=other_headers, json={"comment_content": "탈취"}
         )
 
         assert response.status_code == 403
@@ -181,7 +194,7 @@ class TestComments:
             client.post(
                 f"{API}/posts/{post_id}/comments",
                 headers=author_headers,
-                json={"content": f"댓글 {i}"},
+                json={"comment_content": f"댓글 {i}"},
             )
 
         response = client.get(f"{API}/posts/{post_id}/comments", params={"page": 1, "size": 2})

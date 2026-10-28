@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging_config import configure_logging, get_logger
 from app.core.middleware import RequestContextMiddleware
+from app.infrastructure.database.synchronize import synchronize_database
 from app.infrastructure.scheduler.scheduler import shutdown_scheduler, start_scheduler
 
 logger = get_logger(__name__)
@@ -36,6 +37,11 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
         threadpool_workers=settings.THREADPOOL_MAX_WORKERS,
         db_pool_capacity=settings.DB_POOL_SIZE + settings.DB_MAX_OVERFLOW,
     )
+
+    # 모델 → DB 스키마 자동 동기화. 요청을 받기 전에 스키마를 맞춰 둔다.
+    # 동기(sync) DB 작업이므로 이벤트 루프를 막지 않도록 스레드에서 실행한다.
+    if settings.DB_SYNCHRONIZE:
+        await to_thread.run_sync(synchronize_database)
 
     # 8.25) 추가: 좋아요 DB 동기화 작업 시작
     # 9.01) APScheduler 라이브러리 적용

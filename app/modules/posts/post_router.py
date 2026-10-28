@@ -48,7 +48,6 @@ def list_posts(
     current_user: CurrentUser,
     db: DbSession,
     redis: RedisClient,
-    storage: StorageClient,
 ) -> PostListResponse:
     """게시글 목록을 조회한다."""
 
@@ -56,7 +55,6 @@ def list_posts(
     notices, posts, total = PostService(
         db,
         redis,
-        storage,
     ).list_posts(
         params,
         current_user,
@@ -96,14 +94,12 @@ def get_post(
     current_user: CurrentUser,
     db: DbSession,
     redis: RedisClient,
-    storage: StorageClient,
 ) -> PostDetailResponse:
     """게시글 상세 정보를 조회한다."""
 
     return PostService(
         db,
         redis,
-        storage,
     ).get_detail(
         post_id,
         current_user,
@@ -124,14 +120,12 @@ def create_post(
     current_user: CurrentUser,
     db: DbSession,
     redis: RedisClient,
-    storage: StorageClient,
 ) -> PostSummaryResponse:
     """새로운 게시글을 작성한다."""
 
     return PostService(
         db,
         redis,
-        storage,
     ).create(
         current_user,
         payload,
@@ -149,14 +143,12 @@ def update_post(
     current_user: CurrentUser,
     db: DbSession,
     redis: RedisClient,
-    storage: StorageClient,
 ) -> PostDetailResponse:
     """작성자가 게시글을 수정한다."""
 
     return PostService(
         db,
         redis,
-        storage,
     ).update(
         post_id,
         current_user,
@@ -174,14 +166,12 @@ def delete_post(
     current_user: CurrentUser,
     db: DbSession,
     redis: RedisClient,
-    storage: StorageClient,
 ) -> None:
     """게시글을 논리적으로 삭제한다."""
 
     PostService(
         db,
         redis,
-        storage,
     ).delete(
         post_id,
         current_user,
@@ -201,14 +191,12 @@ def like_post(
     current_user: CurrentUser,
     db: DbSession,
     redis: RedisClient,
-    storage: StorageClient,
 ) -> None:
     """게시글에 좋아요를 등록한다."""
 
     PostService(
         db,
         redis,
-        storage,
     ).like_post(
         post_id,
         current_user,
@@ -225,14 +213,12 @@ def unlike_post(
     current_user: CurrentUser,
     db: DbSession,
     redis: RedisClient,
-    storage: StorageClient,
 ) -> None:
     """게시글 좋아요를 취소한다."""
 
     PostService(
         db,
         redis,
-        storage,
     ).unlike_post(
         post_id,
         current_user,
@@ -251,14 +237,12 @@ def share_post(
     post_id: int,
     db: DbSession,
     redis: RedisClient,
-    storage: StorageClient,
 ) -> PostShareResponse:
     """게시글 공유 URL을 조회한다."""
 
     return PostService(
         db,
         redis,
-        storage,
     ).get_share_url(post_id)
 
 
@@ -290,3 +274,16 @@ def upload_post_image(
         current_user,
         image,
     )
+
+
+@router.get(
+    "/{post_id}/images", response_model=list[PostImageResponse], summary="게시글 이미지 목록"
+)
+def list_post_images(
+    post_id: int,
+    current_user: CurrentUser,
+    db: DbSession,
+    redis: RedisClient,
+    storage: StorageClient,
+) -> list[PostImageResponse]:
+    return PostService(db, redis, storage).list_images(post_id)

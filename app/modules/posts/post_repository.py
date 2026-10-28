@@ -10,7 +10,7 @@
 from typing import cast
 
 from redis import Redis
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, func, select, update
 from sqlalchemy.orm import Session
 
 from app.common.pagination import PageParams
@@ -33,7 +33,7 @@ class PostRepository:
     @staticmethod
     def _active() -> Select[tuple[Post]]:
         """공개 상태인 게시글만 대상으로 하는 기본 쿼리."""
-        return select(Post).where(Post.post_status == "PUBLISHED")
+        return select(Post).where(Post.post_status == "PUBLISHED", Post.deleted_at.is_(None))
 
     # post_id 로 post 를 조회하는 기능
     def get_by_id(self, post_id: int) -> Post | None:
@@ -92,7 +92,11 @@ class PostRepository:
         목록에 댓글 본문은 필요 없으므로 로드하지 않는다.
         필요 없는 데이터를 미리 가져오는 것도 N+1 만큼이나 흔한 성능 문제다.
         """
-        filters = [Post.deleted_at.is_(None)]
+        filters = [
+            Post.deleted_at.is_(None),
+            Post.post_status == "PUBLISHED",
+            Post.post_is_notice.is_(False),
+        ]
         for word in filter_words:
             filters.append(Post.post_title.not_like(f"%{word}%"))
             filters.append(Post.post_content.not_like(f"%{word}%"))
@@ -101,7 +105,7 @@ class PostRepository:
             self._db.scalar(  # scalar : 단일 값 하나만 가져온다.
                 select(func.count())  # func : SQL 함수를 호출하는 메서드 -> COUNT(*)
                 .select_from(Post)  # FROM posts
-                .where(Post.deleted_at.is_(None) and Post.post_is_notice.is_(False))
+                .where(*filters)
             )
             or 0
         )
@@ -109,9 +113,8 @@ class PostRepository:
             self._active()
             .join(User, Post.author_id == User.user_id)
             .add_columns(User)
-            .where(Post.post_is_notice.is_(False))
-            # .order_by(Post.post_id.desc())
-            # * .order_by, desc 등은 지양하는게 좋음,가져와서 로직으로 푸는게 더 데이터 적으로 낫다.
+            .where(*filters)
+            .order_by(Post.post_id.desc())
             .offset(params.offset)
             .limit(params.limit)
         )
@@ -143,8 +146,45 @@ class PostRepository:
 
     # 좋아요 count
     def count_likes(self, post_id: int) -> int:
+        # Write-behind가 DB에 반영되기 전에도 새로고침한 화면에 최신 상태를 보여준다.
+        keys = list(self._redis.scan_iter(match=f"post_like:{post_id}:*"))
+        pending = (
+            {
+                int(key.rsplit(":", 1)[1]): value == "1"
+                for key, value in zip(
+                    keys, cast(list[str | None], self._redis.mget(keys)), strict=True
+                )
+                if value is not None
+            }
+            if keys
+            else {}
+        )
         statement = select(func.count()).select_from(PostLike).where(PostLike.post_id == post_id)
-        return self._db.scalar(statement) or 0
+        total = self._db.scalar(statement) or 0
+        if not pending:
+            return total
+        saved = set(
+            self._db.scalars(
+                select(PostLike.user_id).where(
+                    PostLike.post_id == post_id, PostLike.user_id.in_(pending)
+                )
+            )
+        )
+        return total + sum(int(liked) - int(user_id in saved) for user_id, liked in pending.items())
+
+    def increment_views(self, post: Post) -> None:
+        self._db.execute(
+            update(Post)
+            .where(Post.post_id == post.post_id)
+            .values(post_view_count=Post.post_view_count + 1)
+        )
+        self._db.refresh(post)
+
+    def list_images(self, post_id: int) -> list[PostImage]:
+        statement = (
+            select(PostImage).where(PostImage.post_id == post_id).order_by(PostImage.image_id)
+        )
+        return list(self._db.scalars(statement))
 
     # 게시글 저장
     def add(self, post: Post) -> Post:

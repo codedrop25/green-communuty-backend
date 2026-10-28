@@ -2,7 +2,7 @@
 
 # from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum, String, Text, false
+from sqlalchemy import Enum, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 # * SQLAlchemy 에게 이 파일은 ORM 모델이라고 알려주는 코드, SpringBoot 의 @Entity 와 비슷한 역할
@@ -41,11 +41,11 @@ class Post(Base, TimestampMixin, SoftDeleteMixin):
     )
 
     # 공지 유무
-    # server_default=False() : DB 기본값, 새 커럶 추가시 기존 데이터의 값도 채워지도록 적용함.
-    # false() : SQLAlchemy가 SQL의 거짓 값을 표현하도록 제공하는 함수.
-    post_is_notice: Mapped[bool] = mapped_column(
-        nullable=False, default=False, server_default=false()
-    )
+    # server_default : DB 기본값, 새 컬럼 추가시 기존 데이터의 값도 채워지도록 적용함.
+    # false() 대신 "0" 을 쓰는 이유: MySQL 은 BOOLEAN 기본값을 '0' 으로 보고하는데,
+    # false() 는 "false" 로 렌더링되어 Alembic 비교(alembic check, DB_SYNCHRONIZE)가
+    # 바뀐 것이 없는데도 매번 차이로 인식한다. users.user_is_active 와 같은 방식이다.
+    post_is_notice: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="0")
 
     # * representation, 객체를 개발자가 확인하기 좋은 문자열 형태로 표현하는 특수 메서드
     def __repr__(self) -> str:

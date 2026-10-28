@@ -63,6 +63,7 @@ class CommentRepository:
                     Comment.post_id == post_id,
                     # 삭제 상태가 아닌 댓글만 조회
                     Comment.deleted_at.is_(None),
+                    Comment.parent_comment_id.is_(None),
                 )
             )
             # 댓글이 없으면 0

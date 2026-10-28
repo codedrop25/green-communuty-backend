@@ -28,7 +28,7 @@ class R2Storage(Storage):
         # 3.S3 호환 API 를 사용해 Cloudflare R2 클라이언트를 만든다.
         self._client = boto3.client(
             "s3",
-            endpoint_url=(f"http://{settings.R2_ACCOUNT_ID}.r2.cloudflarestorage.com"),
+            endpoint_url=(f"https://{settings.R2_ACCOUNT_ID}.r2.cloudflarestorage.com"),
             aws_access_key_id=(settings.R2_ACCESS_KEY_ID.get_secret_value()),
             aws_secret_access_key=(settings.R2_SECRET_ACCESS_KEY.get_secret_value()),
             region_name=settings.R2_REGION,

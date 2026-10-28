@@ -18,19 +18,51 @@ SQLite 로 대체하지 않는 이유: 타입/FK/트랜잭션 동작이 MySQL �
 "테스트는 통과하는데 운영에서 깨지는" 상황을 만든다.
 """
 
-from collections.abc import Callable, Generator
+from collections.abc import AsyncGenerator, Callable, Generator
+from contextlib import asynccontextmanager
 from typing import Any, TypeVar, cast
+from uuid import uuid4
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from redis import Redis
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Engine, create_engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 from testcontainers.mysql import MySqlContainer
 from testcontainers.redis import RedisContainer
 
 F = TypeVar("F", bound=Callable[..., Any])
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--native-services",
+        action="store_true",
+        help="Use configured MySQL with a temporary schema and dedicated Redis on localhost:16379.",
+    )
+
+
+@pytest.fixture(scope="session")
+def native_engine() -> Generator[Engine]:
+    from app.core.config import settings
+    from app.infrastructure.database.model_registry import Base
+
+    schema = f"green_test_{uuid4().hex}"
+    admin = create_engine(settings.database_url, isolation_level="AUTOCOMMIT")
+    test_engine = create_engine(make_url(settings.database_url).set(database=schema))
+    with admin.connect() as connection:
+        connection.exec_driver_sql(f"CREATE DATABASE `{schema}` CHARACTER SET utf8mb4")
+    try:
+        Base.metadata.create_all(test_engine)
+        yield test_engine
+    finally:
+        test_engine.dispose()
+        with admin.connect() as connection:
+            connection.exec_driver_sql(f"DROP DATABASE `{schema}`")
+        admin.dispose()
+
 
 fixture = cast(
     Callable[[F], F],
@@ -67,7 +99,7 @@ def redis_container() -> Generator[RedisContainer]:
 
 
 @fixture
-def engine(mysql_container: MySqlContainer) -> Generator[Engine]:
+def engine(request: pytest.FixtureRequest) -> Generator[Engine]:
     """테이블이 생성된 테스트 엔진.
 
     스키마는 Alembic 이 아니라 `Base.metadata.create_all` 로 만든다.
@@ -76,6 +108,12 @@ def engine(mysql_container: MySqlContainer) -> Generator[Engine]:
     (마이그레이션과 모델의 일치 여부는 `alembic check` 로 따로 검증한다)
     """
     from app.infrastructure.database.model_registry import Base
+
+    if request.config.getoption("--native-services"):
+        yield request.getfixturevalue("native_engine")
+        return
+
+    mysql_container = request.getfixturevalue("mysql_container")
 
     url = f"{mysql_container.get_connection_url()}?charset=utf8mb4"
     test_engine = create_engine(url, pool_pre_ping=True)
@@ -96,16 +134,9 @@ def db_session(engine: Engine) -> Generator[Session]:
     """
     connection = engine.connect()
     transaction = connection.begin()
-    session = sessionmaker(bind=connection, expire_on_commit=False)()
-    session.begin_nested()
-
-    @event.listens_for(session, "after_transaction_end")
-    def _restart_savepoint(sess: Session, _trans: object) -> None:
-        # 서비스의 commit() 으로 SAVEPOINT 가 닫히면 즉시 새로 연다.
-        # 이것이 없으면 첫 commit 이후의 쿼리가 바깥 트랜잭션에 직접 쓰여
-        # 롤백으로 되돌릴 수 없게 된다.
-        if not sess.in_nested_transaction() and connection.in_transaction():
-            sess.begin_nested()
+    session = sessionmaker(
+        bind=connection, expire_on_commit=False, join_transaction_mode="create_savepoint"
+    )()
 
     yield session
 
@@ -115,16 +146,22 @@ def db_session(engine: Engine) -> Generator[Session]:
 
 
 @fixture
-def redis_client(redis_container: RedisContainer) -> Generator[Redis]:
+def redis_client(request: pytest.FixtureRequest) -> Generator[Redis]:
     """테스트마다 비워지는 Redis 클라이언트.
 
     컨테이너는 재사용하고 데이터만 비운다 (재생성은 느리다).
     """
-    client: Redis = Redis(
-        host=redis_container.get_container_host_ip(),
-        port=int(redis_container.get_exposed_port(6379)),
-        decode_responses=True,
-    )
+    if request.config.getoption("--native-services"):
+        client: Redis = Redis(host="127.0.0.1", port=16379, decode_responses=True)
+        if client.dbsize() != 0:
+            pytest.fail("Dedicated test Redis must be empty; refusing to clear existing data.")
+    else:
+        redis_container = request.getfixturevalue("redis_container")
+        client = Redis(
+            host=redis_container.get_container_host_ip(),
+            port=int(redis_container.get_exposed_port(6379)),
+            decode_responses=True,
+        )
     client.flushdb()
 
     yield client
@@ -141,6 +178,13 @@ def app(db_session: Session, redis_client: Redis) -> Generator[FastAPI]:
     from app.main import create_app
 
     fastapi_app = create_app()
+
+    @asynccontextmanager
+    async def test_lifespan(_app: FastAPI) -> AsyncGenerator[None]:
+        # Test dependencies own their connections; never run the development DB sync/scheduler.
+        yield
+
+    fastapi_app.router.lifespan_context = test_lifespan
 
     def _override_get_db() -> Generator[Session]:
         # 롤백 경계를 픽스처가 쥐고 있어야 하므로 여기서 close 하지 않는다.

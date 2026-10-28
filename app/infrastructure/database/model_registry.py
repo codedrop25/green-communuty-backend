@@ -20,6 +20,18 @@ from app.modules.menus.menu_model import Menu
 from app.modules.posts.post_image_model import PostImage
 from app.modules.posts.post_like_model import PostLike
 from app.modules.posts.post_model import Post
+from app.modules.reports.report_model import Report
 from app.modules.users.user_model import User
+from app.modules.users.user_sanctions_model import UserSanction
 
-__all__ = ["Base", "Comment", "Menu", "Post", "PostImage", "PostLike", "User"]
+__all__ = [
+    "Base",
+    "Comment",
+    "Menu",
+    "Post",
+    "PostImage",
+    "PostLike",
+    "Report",
+    "User",
+    "UserSanction",
+]

@@ -7,7 +7,39 @@
 
 ---
 
-## 실행 방식 두 가지
+## Docker 없이 실행 (현재 프런트 연동 환경)
+
+이미 실행 중인 MySQL과 Redis를 사용합니다. `.env`의 `MYSQL_*`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`를 실제 접속 정보에 맞춥니다. 비밀번호 없는 로컬 Redis는 `REDIS_PASSWORD=`로 둡니다. 개발용 Redis 기본 포트는 6379입니다.
+
+```bash
+poetry install
+poetry run alembic upgrade head
+poetry run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+`GET http://127.0.0.1:8000/health/ready`에서 `database`와 `redis`가 모두 `ok`인지 확인합니다. 로컬 HTTP에서는 `COOKIE_SECURE=false`, `COOKIE_SAMESITE=lax`를 사용합니다.
+
+프런트엔드는 `green-communuty-front`에서 `.env.local`에 `BACKEND_API_URL=http://127.0.0.1:8000/api/v1`을 설정한 뒤 `npm install`, `npm run dev`로 실행합니다. Next.js가 브라우저 요청과 인증 쿠키를 중계합니다. 이미지 기능은 별도로 S3/R2 설정이 필요합니다.
+
+### Docker 없는 전체 테스트
+
+개발 Redis 6379와 분리된 **테스트 전용 Redis 16379**를 빈 상태로 띄웁니다. 예를 들어 Linux/WSL의 별도 터미널에서:
+
+```bash
+redis-server --port 16379 --save "" --appendonly no
+```
+
+Windows에서 테스트를 실행한다면 `127.0.0.1:16379`로 접근 가능해야 합니다.
+
+```bash
+poetry run pytest --native-services
+```
+
+이 옵션은 Docker를 호출하지 않습니다. 설정된 MySQL 서버에 `green_test_<임의 UUID>` 스키마를 생성하고 종료 시 그 스키마만 삭제하므로, DB 계정에 `CREATE DATABASE`와 `DROP DATABASE` 권한이 필요합니다. 테스트 전용 Redis는 테스트마다 비워집니다. 첫 연결에 데이터가 있으면 삭제하지 않고 실패합니다. 이미지 테스트는 외부 스토리지 경계만 메모리 구현으로 대체합니다.
+
+---
+
+## 기존 컨테이너 실행 방식 (선택 사항)
 
 | 방식 | 설명 | 언제 쓰나 |
 |---|---|---|

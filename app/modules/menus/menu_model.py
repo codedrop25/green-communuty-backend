@@ -14,7 +14,7 @@ from __future__ import annotations
 
 # Index            조회 속도를 올리는 색인
 # UniqueConstraint 중복을 막는 제약조건
-from sqlalchemy import Index, Integer, String, UniqueConstraint
+from sqlalchemy import Integer, String, UniqueConstraint
 
 # Mapped        "이 속성은 DB 컬럼이다" 라고 알려주는 타입 표기
 # mapped_column 기본키 여부, 길이, NULL 허용 같은 세부 설정
@@ -57,6 +57,5 @@ class Menu(Base, TimestampMixin, SoftDeleteMixin):
         # 논리 삭제된 행이 테이블에 그대로 남기 때문에, 이걸 빼면
         # 한 번 지웠던 이름을 다시 만들 수 없게 된다.
         UniqueConstraint("menu_parent_id", "menu_name", "deleted_at", name="uq_menus_parent_name"),
-        # 모든 조회에 deleted_at IS NULL 조건이 붙으므로 색인을 건다.
-        Index("ix_menus_deleted_at", "deleted_at"),
+        # deleted_at 색인은 SoftDeleteMixin의 index=True에서 생성한다.
     )

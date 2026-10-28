@@ -40,30 +40,28 @@ def post_with_comments(client: TestClient, signup: Callable[..., dict[str, str]]
     """댓글 5개가 달린 게시글."""
     headers = signup("nplus1@example.com", "작성자")
     post_id = client.post(
-        f"{API}/posts", headers=headers, json={"title": "N+1", "content": "본문"}
-    ).json()["id"]
+        f"{API}/posts", headers=headers, json={"post_title": "N+1", "post_content": "본문"}
+    ).json()["post_id"]
 
     for i in range(5):
         client.post(
-            f"{API}/posts/{post_id}/comments", headers=headers, json={"content": f"댓글 {i}"}
+            f"{API}/posts/{post_id}/comments",
+            headers=headers,
+            json={"comment_content": f"댓글 {i}"},
         )
 
     yield int(post_id)
 
 
-def test_post_detail_query_count_is_constant(
+def test_comment_list_query_count_is_constant(
     client: TestClient, engine: Engine, post_with_comments: int
 ) -> None:
-    """상세 조회는 댓글 수와 무관하게 고정된 쿼리만 쓴다.
-
-    기대: 게시글 1 + 작성자 1 + 댓글 1 + 댓글작성자 1 = 4
-    지연 로딩이면 댓글 수에 비례해 늘어난다.
-    """
+    """댓글 페이지는 댓글 수와 무관하게 고정된 SELECT만 쓴다."""
     with count_queries(engine) as statements:
-        response = client.get(f"{API}/posts/{post_with_comments}")
+        response = client.get(f"{API}/posts/{post_with_comments}/comments")
 
     assert response.status_code == 200
-    assert len(response.json()["comments"]) == 5
+    assert len(response.json()["items"]) == 5
     assert len(statements) <= 5, f"쿼리가 {len(statements)}개 실행됨 — N+1 가능성:\n" + "\n".join(
         statements
     )
@@ -74,17 +72,19 @@ def test_post_list_query_count_is_constant(
 ) -> None:
     """목록 조회도 게시글 수와 무관해야 한다.
 
-    기대: COUNT 1 + 게시글 1 + 작성자 1 = 3
+    기대: 사용자 인증 + 공지 + COUNT + 작성자가 JOIN된 게시글 목록
     """
     headers = signup("listcount@example.com", "작성자")
     for i in range(5):
-        client.post(f"{API}/posts", headers=headers, json={"title": f"글 {i}", "content": "본문"})
+        client.post(
+            f"{API}/posts", headers=headers, json={"post_title": f"글 {i}", "post_content": "본문"}
+        )
 
     with count_queries(engine) as statements:
-        response = client.get(f"{API}/posts", params={"page": 1, "size": 10})
+        response = client.get(f"{API}/posts", headers=headers, params={"page": 1, "size": 10})
 
     assert response.status_code == 200
     assert len(response.json()["items"]) >= 5
-    assert len(statements) <= 4, f"쿼리가 {len(statements)}개 실행됨 — N+1 가능성:\n" + "\n".join(
+    assert len(statements) <= 5, f"쿼리가 {len(statements)}개 실행됨 — N+1 가능성:\n" + "\n".join(
         statements
     )

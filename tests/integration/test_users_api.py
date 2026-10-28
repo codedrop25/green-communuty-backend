@@ -31,17 +31,19 @@ class TestMe:
         response = client.get(f"{API}/users/me", headers=headers)
 
         assert response.status_code == 200
-        assert response.json()["email"] == "me@example.com"
+        assert response.json()["user_email"] == "me@example.com"
 
     def test_update_nickname(
         self, client: TestClient, signup: Callable[..., dict[str, str]]
     ) -> None:
         headers = signup("update@example.com")
 
-        response = client.patch(f"{API}/users/me", headers=headers, json={"nickname": "변경됨"})
+        response = client.patch(
+            f"{API}/users/me", headers=headers, json={"user_nickname": "변경됨"}
+        )
 
         assert response.status_code == 200
-        assert response.json()["nickname"] == "변경됨"
+        assert response.json()["user_nickname"] == "변경됨"
 
     def test_deactivated_user_is_blocked(
         self, client: TestClient, signup: Callable[..., dict[str, str]]
