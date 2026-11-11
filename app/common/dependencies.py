@@ -12,7 +12,7 @@
 from collections.abc import Callable
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from redis import Redis
 from sqlalchemy.orm import Session
@@ -58,6 +58,20 @@ def get_current_user(
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+def get_admin_user(current_user: CurrentUser) -> User:
+    """현재 로그인 한 사용자의 관리자 권한을 검사한다.
+    기존 CurrentUser 를 통해 로그인한 사용자를 전달받고 관리자 권한을 검사하는 함수."""
+
+    if current_user.user_role != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="관리자 권한이 필요합니다."
+        )
+    return current_user
+
+
+AdminUser = Annotated[User, Depends(get_admin_user)]
 
 
 def require_role(*roles: UserRole) -> Callable[[User], User]:

@@ -9,20 +9,23 @@
 from fastapi import APIRouter, Depends
 
 from app.common.dependencies import get_current_user
+from app.modules.admin.admin_router import router as admin_router
 from app.modules.auth.router import router as auth_router
 from app.modules.comments.comment_router import router as comments_router
 from app.modules.menus.menu_router import router as menus_router
 from app.modules.posts.post_router import router as posts_router
+from app.modules.reports.report_router import router as report_router
 from app.modules.users.user_router import router as users_router
 
 api_router = APIRouter()
-
 api_router.include_router(auth_router)
 
 # 인증 진입점을 제외한 모든 서비스 API는 로그인한 사용자만 이용한다.
 protected_router = APIRouter(dependencies=[Depends(get_current_user)])
-protected_router.include_router(users_router)
-protected_router.include_router(posts_router)
-protected_router.include_router(comments_router)
-protected_router.include_router(menus_router)
+api_router.include_router(users_router)
+api_router.include_router(posts_router)
+api_router.include_router(comments_router)
+api_router.include_router(menus_router)
+api_router.include_router(report_router)
+api_router.include_router(admin_router)
 api_router.include_router(protected_router)
