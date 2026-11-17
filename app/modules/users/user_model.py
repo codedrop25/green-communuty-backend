@@ -28,16 +28,24 @@ class User(Base, TimestampMixin):
 
     user_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
-    user_email: Mapped[str] = mapped_column(
+    # 탈퇴시 null 로 값 변경이 되야 함으로 nullable=True 다.
+    user_email: Mapped[str | None] = mapped_column(
         String(255),
-        nullable=False,
         unique=True,
+        nullable=True,
         comment="로그인 ID 로 사용하는 이메일",
     )
     # 해시만 저장한다. 컬럼명에 `hash` 를 넣어 원문 저장을 코드 리뷰에서 바로 잡을 수 있게 한다.
-    user_password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    # 탈퇴시 null 로 값 변경이 되야 함으로 nullable=True 다.
+    user_password_hash: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
 
-    user_nickname: Mapped[str] = mapped_column(String(50), nullable=False, comment="표시 이름")
+    # 탈퇴시 null 로 값 변경이 되야 함으로 nullable=True 다.
+    user_nickname: Mapped[str | None] = mapped_column(
+        String(50), unique=True, nullable=True, comment="표시 이름"
+    )
 
     user_role: Mapped[UserRole] = mapped_column(
         # native_enum=False 로 VARCHAR(20) 에 저장한다.

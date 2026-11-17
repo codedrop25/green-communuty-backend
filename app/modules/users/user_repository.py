@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.common.pagination import PageParams
 from app.modules.users.user_model import User
+from app.modules.users.user_withdrawals_model import UserWithdrawal
 
 
 class UserRepository:
@@ -54,3 +55,11 @@ class UserRepository:
     def flush(self) -> None:
         """수정된 엔티티의 변경사항을 DB 로 내보낸다 (commit 아님)."""
         self._db.flush()
+
+    def get_user_withdrawal(self, user_id: int) -> UserWithdrawal | None:
+        """회원 탈퇴 이력 조회."""
+        statement = select(UserWithdrawal).where(UserWithdrawal.user_id == user_id)
+        return self._db.scalar(statement)
+
+    def update_user_status(self) -> User | None:
+        """관리자용 회원 상태(active/inactive) 변경."""

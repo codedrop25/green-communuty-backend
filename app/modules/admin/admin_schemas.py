@@ -1,9 +1,12 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr
+
+from app.modules.users.user_model import UserRole
 
 
 class AdminUserResponse(BaseModel):
     """관리자용 회원 조회 응답."""
 
+    # SQLAlchemy 의 User 객체를 Pydantic 응답 모델로 변환한다.
     model_config = ConfigDict(from_attributes=True)
 
     user_id: int
@@ -19,3 +22,22 @@ class AdminUserListResponse(BaseModel):
     page: int
     size: int
     total_pages: int
+
+
+class AdminUserDetailResponse(BaseModel):
+    """관리자용 회원 단일 조회 응답."""
+
+    # SQLAlchemy 의 User 객체를 Pydantic 응답 모델로 변환한다.
+    model_config = ConfigDict(from_attributes=True)
+
+    user_id: int
+    user_email: EmailStr
+    user_nickname: str
+    user_role: UserRole
+    user_is_active: bool
+
+
+class AdminUserStatusRequest(BaseModel):
+    """회원 상태 수정용 요청."""
+
+    user_is_active: bool

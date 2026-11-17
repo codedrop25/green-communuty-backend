@@ -70,18 +70,23 @@ class AuthService:
         # 유저가 없어도 해시 검증을 수행해 응답을 동일하게 맞춘다.
         password_ok = verify_password(
             password,
-            user.user_password_hash if user is not None else _DUMMY_PASSWORD_HASH,
+            (
+                user.user_password_hash
+                if user is not None and user.user_password_hash is not None
+                else _DUMMY_PASSWORD_HASH
+            ),
         )
 
-        if user is None or not password_ok:
+        if (
+            user is None
+            or not user.user_is_active
+            or user.user_password_hash is None
+            or not password_ok
+        ):
             logger.warning("login_failed", email=email, reason="invalid_credentials")
             raise UnauthorizedError("이메일 또는 비밀번호가 올바르지 않습니다.")
 
-        if not user.user_is_active:
-            logger.warning("login_failed", user_id=user.user_id, reason="inactive")
-            raise UnauthorizedError("이메일 또는 비밀번호가 올바르지 않습니다.")
-
-        # 정상 로그인했으므로 실패 카운터를 비운다.
+        # 정상 로그인했으므로 실패 카운터를 초기화.
         # 이것이 없으면 정상 사용자가 오타 몇 번으로 윈도우 내내 잠긴다.
         self._reset_login_rate_limit(email, client_ip)
 

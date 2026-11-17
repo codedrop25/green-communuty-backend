@@ -53,3 +53,19 @@ class UserResponse(BaseModel):
     user_role: UserRole
     user_is_active: bool
     user_created_at: datetime = Field(validation_alias="created_at")
+
+
+class UserWithdrawRequest(BaseModel):
+    """일반 회원 탈퇴 요청."""
+
+    user_withdrawal_reason: str
+
+
+class UserWithdrawResponse(BaseModel):
+    """일반 회원 탈퇴 응답."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    user_withdrawal_id: int
+    user_withdrawal_email: str
+    user_withdrawal_nickname: str

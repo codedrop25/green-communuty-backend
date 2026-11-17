@@ -14,8 +14,8 @@ from app.common.dependencies import CurrentUser, DbSession
 from app.core.config import settings
 from app.core.exceptions import UnauthorizedError
 from app.infrastructure.cache.redis import get_redis
-from app.modules.auth.schemas import LoginRequest, MessageResponse, TokenResponse
-from app.modules.auth.service import AuthService, IssuedTokens
+from app.modules.auth.auth_schemas import LoginRequest, MessageResponse, TokenResponse
+from app.modules.auth.auth_service import AuthService, IssuedTokens
 from app.modules.users.user_schemas import UserCreate, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])

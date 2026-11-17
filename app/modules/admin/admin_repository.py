@@ -19,7 +19,6 @@ class AdminRepository:
         """전체 회원 목록을 페이지별로 조회."""
 
         offset = (page - 1) * size
-
         statement = select(User)
 
         if keyword:
@@ -40,3 +39,8 @@ class AdminRepository:
             statement = statement.where(User.user_nickname.contains(keyword))
 
         return self._db.scalar(statement) or 0
+
+    def get_user(self, user_id: int) -> User | None:
+        """회원 ID 로 단일 회원 조회."""
+        statement = select(User).where(User.user_id == user_id)
+        return self._db.scalar(statement)

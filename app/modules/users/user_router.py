@@ -5,13 +5,17 @@ Router 규칙 (PLAN.md 3-1): 요청/응답과 DTO 검증만 담당하고 비즈�
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response
 
-from app.common.dependencies import CurrentUser, DbSession, require_role
+from app.common.dependencies import CurrentUser, DbSession, RedisClient, require_role
 from app.common.pagination import PageParams, PageResponse
+from app.modules.auth.auth_router import _clear_refresh_cookie
+from app.modules.auth.auth_schemas import MessageResponse
+from app.modules.auth.auth_service import AuthService
 from app.modules.users.user_model import UserRole
-from app.modules.users.user_schemas import UserResponse, UserUpdate
+from app.modules.users.user_schemas import UserResponse, UserUpdate, UserWithdrawRequest
 from app.modules.users.user_service import UserService
+from app.modules.users.user_withdrawals_service import UserWithdrawalService
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -29,15 +33,6 @@ def update_me(
 ) -> UserResponse:
     user = UserService(db).update(current_user, payload)
     return UserResponse.model_validate(user)
-
-
-@router.delete(
-    "/me",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="회원 탈퇴 (계정 비활성화)",
-)
-def deactivate_me(current_user: CurrentUser, db: DbSession) -> None:
-    UserService(db).deactivate(current_user)
 
 
 @router.get(
@@ -67,3 +62,29 @@ def list_users(
 def get_user(user_id: int, db: DbSession) -> UserResponse:
     user = UserService(db).get(user_id)
     return UserResponse.model_validate(user)
+
+
+@router.patch(
+    "/me/withdraw",
+    response_model=MessageResponse,
+    summary="회원 탈퇴 (계정 비활성화)",
+)
+def withdraw_me(
+    current_user: CurrentUser,
+    payload: UserWithdrawRequest,
+    response: Response,
+    db: DbSession,
+    redis: RedisClient,
+) -> MessageResponse:
+    """일반 회원 탈퇴."""
+
+    # 1. 회원 탈퇴 처리
+    UserWithdrawalService(db).withdraw_me(current_user.user_id, payload)
+
+    # 2. 모든 기기의 세션 종료
+    AuthService(db, redis).logout_all(current_user.user_id)
+
+    # 3. Refresh Token 쿠키 삭제
+    _clear_refresh_cookie(response)
+
+    return MessageResponse(message="로그아웃되었습니다.")
