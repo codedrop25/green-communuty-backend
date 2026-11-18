@@ -23,6 +23,7 @@ from app.modules.posts.post_model import Post
 from app.modules.reports.report_model import Report
 from app.modules.users.user_model import User
 from app.modules.users.user_sanctions_model import UserSanction
+from app.modules.users.user_withdrawals_model import UserWithdrawal
 
 __all__ = [
     "Base",
@@ -34,4 +35,5 @@ __all__ = [
     "Report",
     "User",
     "UserSanction",
+    "UserWithdrawal",
 ]
